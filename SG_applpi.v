@@ -1,4 +1,5 @@
 Add LoadPath "/home/amos/applpi".
+(** https://github.com/syndicate-storage/syndicate-core/blob/master/protobufs/sg.proto *)
 
 Require Import libapplpi.
 Require Import SG_applpi_string.
@@ -22,11 +23,9 @@ Definition may_fail := nuP
 (** Manifest data plane *)
 (* c.f. protobufs/sg.proto: l.44-60 *)
 Record Manifest : Set := manifest
-  { volume_id : String; 
-    coordinator_id : String;
+  { volume_id : String;
     owner_id : String;
     file_id : String;
-    file_version : String;
     size : String}.
 
 (** Definition of Syndicate requests from client *)
@@ -61,3 +60,29 @@ Inductive RespMsg : Set :=
   | resp_rename_hint : RespMsg.
 
 Definition OutputStream := chan RespMsg true.
+
+Definition ToFileSystem : Set := chan Manifest true.
+
+Record SGstate : Set := sg_state
+  {in_stream : InputStream;
+   to_client : OutputStream;
+(* Manifest info *)
+   from_client : String;
+(* file system is modeled as a process *)
+   to_fs : ToFileSystem }.
+
+Definition update_from (st : SGstate) (data: String) : SGstate := 
+  sg_state (in_stream st) (to_client st)
+  data (to_fs st).
+
+Definition STATE : Set := SGstate.
+
+Definition reply (r : RespMsg) (c : OutputStream) (cont : proc) : proc :=
+  c << r >> cont.
+
+Definition get_req (c : InputStream) (cont : SG_req -> proc) : proc :=
+  c ?? cont.
+
+Definition save_data (data : String) (st : STATE) (cont : proc) : proc :=
+  let m := manifest (from_client st) data in to_fs st << m >> cont.
+
