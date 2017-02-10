@@ -84,5 +84,8 @@ Definition get_req (c : InputStream) (cont : SG_req -> proc) : proc :=
   c ?? cont.
 
 Definition save_data (data : String) (st : STATE) (cont : proc) : proc :=
-  let m := manifest (from_client st) data in to_fs st << m >> cont.
+  let m := manifest (from_client st) data in
+  to_fs st << m >> cont.
+
+
 
