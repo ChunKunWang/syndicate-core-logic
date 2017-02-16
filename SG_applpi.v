@@ -3,6 +3,8 @@ Add LoadPath "/home/amos/applpi".
 
 Require Import libapplpi.
 Require Import SG_applpi_string.
+Require Import SG_fs.
+Require Import Coq.FSets.FMapList.
 
 (** Result channel *)
 Axiom result_chan : chan unit false.
@@ -61,17 +63,15 @@ Inductive RespMsg : Set :=
 
 Definition OutputStream := chan RespMsg true.
 
-Definition ToFileSystem : Set := chan Manifest true.
-
 Record SGstate : Set := sg_state
   {in_stream : InputStream;
    to_client : OutputStream;
 (* Manifest info *)
-   from_client : String;
+   from_client : Manifest;
 (* file system is modeled as a process *)
-   to_fs : ToFileSystem }.
+   to_fs : FileSystemState }.
 
-Definition update_from (st : SGstate) (data: String) : SGstate := 
+Definition update_from (st : SGstate) (data: Manifest) : SGstate := 
   sg_state (in_stream st) (to_client st)
   data (to_fs st).
 
@@ -82,10 +82,5 @@ Definition reply (r : RespMsg) (c : OutputStream) (cont : proc) : proc :=
 
 Definition get_req (c : InputStream) (cont : SG_req -> proc) : proc :=
   c ?? cont.
-
-Definition save_data (data : String) (st : STATE) (cont : proc) : proc :=
-  let m := manifest (from_client st) data in
-  to_fs st << m >> cont.
-
 
 
