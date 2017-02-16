@@ -7,4 +7,12 @@ Require Import Coq.FSets.FMapList.
 Record FileSystemState : Set := file_sys_st
   {fs_st : list (String * list bool)}.
 
-(*Definition Read (file_name : String) (offset : nat) (file_st : FileSystemState) : bool :=. *)
+Inductive empty_set : Set := .
+
+Definition FS_Read (file_name : String) (offset : nat) (file_st : FileSystemState) : bool :=
+  match file_name with
+    | _ => match offset with
+             | O => false
+             | s => true
+           end
+  end.
