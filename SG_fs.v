@@ -77,9 +77,30 @@ Definition FS_Write_Main (file_name : string) (offset : nat) (content : bool) (f
   end.
 
 
-Definition FS_Create (file_name : string) (file_st : FileSystemState) : option FileSystemState :=
-  match file_name with
-    | file_sys_st st => 
+Fixpoint Create_File (file_name : string) (file_st : list (string * list bool)) : (list (string * list bool)) :=
+  match file_st with
+    | nil => file_st (* how to create a new entry as file_name and empty list bool? *)
+    | _ => file_st (* how to append new file to file_st? *)
+  end.
+
+Fixpoint FS_Create (file_name : string) (file_st : list (string * list bool)) : option (list (string * list bool)) :=
+  match file_st with
+    | nil => None
+    | hd::tl => match hd with
+                  | (name,content) => if string_dec file_name name then Some (hd::tl)
+                                      else match FS_Create file_name tl with
+                                             | None => None
+                                             | a => a (* why not 'Create_File file_name a'? *)
+                                           end
+                end 
+  end.
+
+Definition FS_Create_Main (file_name : string) (file_st : FileSystemState) : option FileSystemState :=
+  match file_st with
+    | file_sys_st st => match FS_Create file_name st with
+                          | None => None
+                          | Some new => Some (file_sys_st new)
+                        end
   end.
 
 
