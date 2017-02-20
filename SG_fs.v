@@ -77,20 +77,14 @@ Definition FS_Write_Main (file_name : string) (offset : nat) (content : bool) (f
   end.
 
 
-Fixpoint Create_File (file_name : string) (file_st : list (string * list bool)) : (list (string * list bool)) :=
-  match file_st with
-    | nil => file_st (* how to create a new entry as file_name and empty list bool? *)
-    | _ => file_st (* how to append new file to file_st? *)
-  end.
-
 Fixpoint FS_Create (file_name : string) (file_st : list (string * list bool)) : option (list (string * list bool)) :=
   match file_st with
-    | nil => None
+    | nil => Some [(file_name,nil)]
     | hd::tl => match hd with
-                  | (name,content) => if string_dec file_name name then Some (hd::tl)
+                  | (name,content) => if string_dec file_name name then None
                                       else match FS_Create file_name tl with
                                              | None => None
-                                             | a => a (* why not 'Create_File file_name a'? *)
+                                             | Some a => Some (hd::a) 
                                            end
                 end 
   end.
@@ -102,6 +96,146 @@ Definition FS_Create_Main (file_name : string) (file_st : FileSystemState) : opt
                           | Some new => Some (file_sys_st new)
                         end
   end.
+
+Fixpoint FS_Delete (file_name : string) (file_st : list (string * list bool)) : option (list (string * list bool)) :=
+  match file_st with
+    | nil => None
+    | hd::tl => match hd with
+                  | (name, content) => if string_dec file_name name then Some tl
+                                       else match FS_Delete file_name tl with
+                                              | None => None
+                                              | Some a => Some (hd::a)
+                                            end
+                end
+  end.
+
+Definition FS_Delete_Main (file_name : string) (file_st : FileSystemState) : option FileSystemState :=
+  match file_st with
+    | file_sys_st st => match FS_Create file_name st with
+                          | None => None
+                          | Some new => Some (file_sys_st new)
+                        end
+  end.
+
+Fixpoint FS_Rename (old_file_name : string) (new_file_name : string) (file_st : list (string * list bool)) : option (list (string * list bool)) :=
+  match file_st with
+    | nil => None
+    | hd::tl => match hd with
+                  | (name, content) => if string_dec new_file_name name then None
+                                       else if string_dec old_file_name name then match FS_Rename old_file_name new_file_name tl with
+                                                                                    | None => None
+                                                                                    | Some a => Some ((new_file_name, content)::a)
+                                                                                   end
+                                       else match FS_Rename old_file_name new_file_name tl with
+                                              | None => None
+                                              | Some a => Some (hd::a)
+                                            end
+                end                     
+  end.
+
+Definition FS_Rename_Main (old_file_name : string) (new_file_name : string) (file_st : FileSystemState) : option FileSystemState :=
+  match file_st with
+    | file_sys_st st => match FS_Rename old_file_name new_file_name st with
+                          | None => None
+                          | Some new => Some (file_sys_st new)
+                        end
+  end.
+
+Fixpoint Truncate_Length (new_len : nat) (content : list bool) : option (list bool) :=
+  match new_len with 
+    | O => Some []
+    | S rest => match content with
+                  | [] => None
+                  | hd::tl => match Truncate_Length rest tl with
+                                | None => None
+                                | Some new_content => Some (hd::new_content)
+                              end
+                end
+  end.
+
+Fixpoint FS_Truncate (file_name : string) (new_len : nat) (file_st : list (string * list bool)) : option (list (string * list bool)) :=
+  match file_st with
+    | [] => None
+    | hd::tl => match hd with
+                  | (name, content) => if string_dec file_name name then match Truncate_Length new_len content with
+                                                                           | None => None
+                                                                           | Some new_content => Some ((name, new_content)::tl)
+                                                                         end
+                                       else match FS_Truncate file_name new_len tl with
+                                              | None => None
+                                              | Some a => Some (hd::a)
+                                             end
+                 end
+  end.
+
+Definition FS_Truncate_Main (file_name : string) (new_len : nat) (file_st : FileSystemState) : option FileSystemState :=
+  match file_st with
+    | file_sys_st st => match FS_Truncate file_name new_len st with
+                          | None => None
+                          | Some new => Some (file_sys_st new)
+                        end
+  end.
+
+
+Fixpoint Visit_FS (file_st : list (string * list bool)) : list string :=
+  match file_st with
+    | [] => []
+    | hd::tl => match hd with
+                  | (name, content) => (name::Visit_FS tl)
+                end
+  end.
+
+Definition Return_All_Filename (file_st : FileSystemState) : list string :=
+  match file_st with
+    | file_sys_st st => match Visit_FS st with
+                          | [] => []
+                          | a => a
+                        end
+  end.
+
+
+Fixpoint Check_OUF_2 (file_name : string) (file_st : list (string * list bool)) : Prop :=
+  match file_st with
+    | [] => True
+    | hd::tl => match hd with
+                  | (name, content) => ~(file_name = name) /\ Check_OUF_2 file_name tl
+                end
+  end.
+
+Fixpoint Check_OUF (file_st : list (string * list bool)) : Prop :=
+  match file_st with
+    | [] => True
+    | hd::tl => match hd with
+                  | (name, content) => Check_OUF_2 name tl /\ Check_OUF tl
+                end
+  end.
+
+Definition Only_Unique_Filename (file_st : FileSystemState) : Prop :=
+  match file_st with
+    | file_sys_st st => Check_OUF st
+  end.
+
+Lemma Check_Write : forall file_st file_name offset content, Only_Unique_Filename file_st -> match FS_Write_Main file_name offset content file_st with 
+                                                                                               | None => True
+                                                                                               | Some a => Only_Unique_Filename a
+                                                                                             end.
+intros.
+destruct file_st.
+induction fs_st0.
+simpl.
+auto.
+destruct a.
+simpl.
+destruct (string_dec file_name s).
+destruct (write_content l offset content).
+simpl.
+simpl in H.
+auto.
+auto.
+simpl in H.
+simpl in IHfs_st0.
+destruct (FS_Write file_name offset content fs_st0).
+simpl.
 
 
 
