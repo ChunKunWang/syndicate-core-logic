@@ -187,12 +187,61 @@ Fixpoint Visit_FS (file_st : list (string * list bool)) : list string :=
 
 Definition Return_All_Filename (file_st : FileSystemState) : list string :=
   match file_st with
-    | file_sys_st st => match Visit_FS st with
-                          | [] => []
-                          | a => a
-                        end
+    | file_sys_st st => Visit_FS st
   end.
 
+Lemma Check_Write_Doesnot_Change_Filename : forall file_st file_name offset content, match FS_Write_Main file_name offset content file_st with 
+                                                               | None => True
+                                                               | Some new_st => Return_All_Filename new_st = Return_All_Filename file_st
+                                                              end.
+intros.
+destruct file_st.
+simpl.
+induction fs_st0.
+simpl.
+auto.
+simpl.
+destruct a.
+destruct (string_dec file_name s).
+destruct (write_content l offset content).
+simpl.
+reflexivity.
+auto.
+destruct (FS_Write file_name offset content fs_st0).
+simpl.
+simpl in IHfs_st0.
+rewrite IHfs_st0.
+reflexivity.
+auto.
+Qed.
+
+Fixpoint Visit_FS_Append (file_list : list string) (filename : string) : list string :=
+  match file_list with
+    | [] => [filename]
+    | hd::tl => hd::Visit_FS_Append tl filename
+  end.
+
+Lemma Check_Create_Append: forall file_st file_name, match FS_Create_Main file_name file_st with
+                                                       | None => True
+                                                       | Some new_st => Visit_FS_Append (Return_All_Filename file_st) file_name = Return_All_Filename new_st
+                                                     end.
+intros.
+destruct file_st.
+simpl.
+induction fs_st0.
+simpl.
+reflexivity.
+simpl.
+destruct a.
+destruct (string_dec file_name s).
+auto.
+destruct (FS_Create file_name fs_st0).
+simpl.
+simpl in IHfs_st0.
+rewrite IHfs_st0.
+reflexivity.
+auto.
+Qed.
 
 Fixpoint Check_OUF_2 (file_name : string) (file_st : list (string * list bool)) : Prop :=
   match file_st with
@@ -215,27 +264,41 @@ Definition Only_Unique_Filename (file_st : FileSystemState) : Prop :=
     | file_sys_st st => Check_OUF st
   end.
 
-Lemma Check_Write : forall file_st file_name offset content, Only_Unique_Filename file_st -> match FS_Write_Main file_name offset content file_st with 
+Fixpoint Check_OUF_2_Allfilename (file_name : string) (file_st : list string) : Prop :=
+  match file_st with
+    | [] => True
+    | hd::tl => ~(file_name = hd) /\ Check_OUF_2_Allfilename file_name tl
+  end.
+
+Fixpoint Check_OUF_Allfilename (file_st : list string) : Prop :=
+  match file_st with
+    | [] => True
+    | hd::tl => Check_OUF_2_Allfilename hd tl /\ Check_OUF_Allfilename tl
+  end.
+
+Definition Return_Filename_Unique (file_st : FileSystemState) : Prop :=
+  Check_OUF_Allfilename (Return_All_Filename file_st).
+
+Lemma Check_Write : forall file_st file_name offset content, Return_Filename_Unique file_st -> match FS_Write_Main file_name offset content file_st with 
                                                                                                | None => True
-                                                                                               | Some a => Only_Unique_Filename a
+                                                                                               | Some a => Return_Filename_Unique a
                                                                                              end.
 intros.
 destruct file_st.
-induction fs_st0.
 simpl.
-auto.
-destruct a.
-simpl.
-destruct (string_dec file_name s).
-destruct (write_content l offset content).
-simpl.
-simpl in H.
-auto.
-auto.
-simpl in H.
-simpl in IHfs_st0.
+pose Check_Write_Doesnot_Change_Filename.
+specialize y.
+specialize (y (file_sys_st fs_st0) file_name offset content).
+simpl in y.
 destruct (FS_Write file_name offset content fs_st0).
-simpl.
-
+simpl in y.
+unfold Return_Filename_Unique.
+unfold Return_All_Filename.
+unfold Return_Filename_Unique in H.
+unfold Return_All_Filename in H.
+rewrite y.
+auto.
+auto.
+Qed.
 
 
