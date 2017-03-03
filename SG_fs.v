@@ -185,57 +185,104 @@ Fixpoint Visit_FS (file_st : list (string * list bool)) : list string :=
                 end
   end.
 
+(* retrieve all filenames from the file system *)
 Definition Return_All_Filename (file_st : FileSystemState) : list string :=
   match file_st with
     | file_sys_st st => Visit_FS st
   end.
 
+(* Proof: write operation doesn't change the existing file name in the file system *)
 Lemma Check_Write_Doesnot_Change_Filename : forall file_st file_name offset content, match FS_Write_Main file_name offset content file_st with 
-                                                               | None => True
-                                                               | Some new_st => Return_All_Filename new_st = Return_All_Filename file_st
-                                                              end.
-intros.
-destruct file_st.
-simpl.
-induction fs_st0.
-simpl.
-auto.
-simpl.
-destruct a.
-destruct (string_dec file_name s).
-destruct (write_content l offset content).
-simpl.
-reflexivity.
-auto.
-destruct (FS_Write file_name offset content fs_st0).
-simpl.
-simpl in IHfs_st0.
-rewrite IHfs_st0.
-reflexivity.
-auto.
+                                                    | None => True (* write fail means always true *)
+                                                    | Some new_st => Return_All_Filename new_st = Return_All_Filename file_st 
+                                                    end. (* new and old file names in file system remain the same *)
+intros.                                    (* introduce inductive definition *)
+destruct file_st.                          (* destruct inductive data type for file_st become fs_st0 *)
+simpl.                                     (* compute *)
+induction fs_st0.                          (* instantiate fs_st0 into two cases *)
+simpl.                                     (* case [] is trivial *)
+auto.                                      (* solve the current goal *)
+simpl.                                     (* bring FS_Write func in *)
+destruct a.                                (* pair is also an inductive type *)
+destruct (string_dec file_name s).         (* instantiate if into two cases *)
+destruct (write_content l offset content). (* instantiate write_content into its cases *)
+simpl.                                     (* compute *)
+reflexivity.                               (* equal to *)
+auto.                                      (* solve the current goal *)
+destruct (FS_Write file_name offset content fs_st0). (* instantiate FS_Write into its cases *)
+simpl.                                     (* compute *)
+simpl in IHfs_st0.                         (* in induction, we need to use hypothesis *)
+rewrite IHfs_st0.                          (* apply IHfs_st0 into current goal *)
+reflexivity.                               (* equal to *)
+auto.                                      (* solve the current goal *)
 Qed.
 
+(* check new filename append to the file system *)
 Fixpoint Visit_FS_Append (file_list : list string) (filename : string) : list string :=
   match file_list with
     | [] => [filename]
     | hd::tl => hd::Visit_FS_Append tl filename
   end.
 
-Lemma Check_Create_Append: forall file_st file_name, match FS_Create_Main file_name file_st with
-                                                       | None => True
-                                                       | Some new_st => Visit_FS_Append (Return_All_Filename file_st) file_name = Return_All_Filename new_st
-                                                     end.
+(* Compare every filename of the file list in the way of bubble sort *)
+Fixpoint Check_UniqueFile_FileList (file_name : string) (file_st : list string) : Prop :=
+  match file_st with
+    | [] => True
+    | hd::tl => ~(file_name = hd) /\ Check_UniqueFile_FileList file_name tl
+  end.
+
+(* check all filenames are unique when input is the file list; OUF means Only_Unique_Filename *)
+Fixpoint Check_UniqueFile_Allfilename (file_st : list string) : Prop :=
+  match file_st with
+    | [] => True
+    | hd::tl => Check_UniqueFile_FileList hd tl /\ Check_UniqueFile_Allfilename tl
+  end.
+
+(* check all filenames are unique when input is FileSystemState *)
+Definition Return_Filename_Unique (file_st : FileSystemState) : Prop :=
+  Check_UniqueFile_Allfilename (Return_All_Filename file_st).
+
+(* Proof: write operation doesn't violate the property that all filenames are unique *)
+Lemma Check_Write : forall file_st file_name offset content, Return_Filename_Unique file_st -> match FS_Write_Main file_name offset content file_st with 
+                                                               | None => True (* write fail means always true *)
+                                                               | Some a => Return_Filename_Unique a
+                                                             end. (* all filenames are unique after write operation *)
+intros.                                                       (* introduce inductive definition *)
+destruct file_st.                                             (* destruct inductive data type for file_st become fs_st0 *)
+simpl.                                                        (* go into FS_Write_Main *)
+pose Check_Write_Doesnot_Change_Filename.                     (* apply other lemma in this proof *)
+specialize (y (file_sys_st fs_st0) file_name offset content). (* bring concrete terms for universal quantification of lemma; name new one as y *)
+simpl in y.                                                   (* compute for y*)
+destruct (FS_Write file_name offset content fs_st0).          (* instantiate FS_write into its cases *)
+simpl in y.                                                   (* compute for y *)
+unfold Return_Filename_Unique.                                (* bring function in *)
+unfold Return_All_Filename.                                   (* can be replaced by simpl *)
+unfold Return_Filename_Unique in H.                           (* bring function in H *)
+unfold Return_All_Filename in H.                              (* can be replace by simpl in H *)
+rewrite y.                                                    (* apply y into our goal *)
+auto.                                                         (* compute *)
+auto.                                                         (* solve the current goal *)
+Qed.
+
+
+Lemma Truncate_Doesnot_Change_Filename : forall file_st file_name length, match FS_Truncate_Main file_name length file_st with 
+                                                    | None => True (* truncate fail means always true *)
+                                                    | Some new_st => Return_All_Filename new_st = Return_All_Filename file_st 
+                                                    end. (* new and old file names in file system remain the same *)
 intros.
 destruct file_st.
 simpl.
 induction fs_st0.
 simpl.
-reflexivity.
+auto.
 simpl.
 destruct a.
 destruct (string_dec file_name s).
+destruct (Truncate_Length length l).
+simpl.
+reflexivity.
 auto.
-destruct (FS_Create file_name fs_st0).
+destruct (FS_Truncate file_name length fs_st0).
 simpl.
 simpl in IHfs_st0.
 rewrite IHfs_st0.
@@ -243,54 +290,17 @@ reflexivity.
 auto.
 Qed.
 
-Fixpoint Check_OUF_2 (file_name : string) (file_st : list (string * list bool)) : Prop :=
-  match file_st with
-    | [] => True
-    | hd::tl => match hd with
-                  | (name, content) => ~(file_name = name) /\ Check_OUF_2 file_name tl
-                end
-  end.
-
-Fixpoint Check_OUF (file_st : list (string * list bool)) : Prop :=
-  match file_st with
-    | [] => True
-    | hd::tl => match hd with
-                  | (name, content) => Check_OUF_2 name tl /\ Check_OUF tl
-                end
-  end.
-
-Definition Only_Unique_Filename (file_st : FileSystemState) : Prop :=
-  match file_st with
-    | file_sys_st st => Check_OUF st
-  end.
-
-Fixpoint Check_OUF_2_Allfilename (file_name : string) (file_st : list string) : Prop :=
-  match file_st with
-    | [] => True
-    | hd::tl => ~(file_name = hd) /\ Check_OUF_2_Allfilename file_name tl
-  end.
-
-Fixpoint Check_OUF_Allfilename (file_st : list string) : Prop :=
-  match file_st with
-    | [] => True
-    | hd::tl => Check_OUF_2_Allfilename hd tl /\ Check_OUF_Allfilename tl
-  end.
-
-Definition Return_Filename_Unique (file_st : FileSystemState) : Prop :=
-  Check_OUF_Allfilename (Return_All_Filename file_st).
-
-Lemma Check_Write : forall file_st file_name offset content, Return_Filename_Unique file_st -> match FS_Write_Main file_name offset content file_st with 
-                                                                                               | None => True
-                                                                                               | Some a => Return_Filename_Unique a
-                                                                                             end.
+Lemma Check_Truncate : forall file_st file_name length, Return_Filename_Unique file_st -> match FS_Truncate_Main file_name length file_st with 
+                                                               | None => True (* truncate fail means always true *)
+                                                               | Some a => Return_Filename_Unique a
+                                                             end. (* all filenames are unique after write operation *)
 intros.
 destruct file_st.
 simpl.
-pose Check_Write_Doesnot_Change_Filename.
-specialize y.
-specialize (y (file_sys_st fs_st0) file_name offset content).
+pose Truncate_Doesnot_Change_Filename.
+specialize (y (file_sys_st fs_st0) file_name length).
 simpl in y.
-destruct (FS_Write file_name offset content fs_st0).
+destruct (FS_Truncate file_name length fs_st0).
 simpl in y.
 unfold Return_Filename_Unique.
 unfold Return_All_Filename.
@@ -301,4 +311,59 @@ auto.
 auto.
 Qed.
 
+(* Proof: create operation always append new filename in the end *)
+Lemma Check_Create_Append: forall file_st file_name, match FS_Create_Main file_name file_st with
+                                    | None => True (* create fail means always true *)
+                                    | Some new_st => Visit_FS_Append (Return_All_Filename file_st) file_name = Return_All_Filename new_st
+                                  end. (* new and old file names in file system remain the same *)
+intros.                                (* introduce inductive definition *)
+destruct file_st.                      (* destruct inductive data type for file_st become fs_st0 *)
+simpl.                                 (* compute *)
+induction fs_st0.                      (* instantiate fs_st0 into two cases *)
+simpl.                                 (* case [] is trivial *)
+reflexivity.                           (* equal to *)
+simpl.                                 (* go into FS_Create *)
+destruct a.                            (* pair is also an inductive type *)
+destruct (string_dec file_name s).     (* instantiate if into two cases *)
+auto.                                  (* solve the current goal *)
+destruct (FS_Create file_name fs_st0). (* instantiate FS_Create into its cases *)
+simpl.                                 (* compute *)
+simpl in IHfs_st0.                     (* in induction, we need to use hypothesis *)
+rewrite IHfs_st0.                      (* apply IHfs_st0 into current goal *)
+reflexivity.                           (* equal to *)
+auto.                                  (* solve the current goal *)
+Qed.
 
+Lemma Create_NewOne_notSame_inFileSys : forall file_st file_name, Return_Filename_Unique file_st -> match FS_Create_Main file_name file_st with 
+                                                             | None => True (* truncate fail means always true *)
+                                                             | Some a => Check_UniqueFile_FileList file_name (Return_All_Filename file_st)
+                                                           end. (* all filenames are unique after write operation *)
+intros.
+destruct file_st.
+simpl.
+induction fs_st0.
+simpl.
+auto.
+simpl.
+destruct a.
+destruct (string_dec file_name s).
+auto.
+destruct (FS_Create file_name fs_st0).
+simpl.
+split.
+auto.
+apply IHfs_st0.
+unfold Return_Filename_Unique in H.
+simpl in H.
+unfold Return_Filename_Unique.
+simpl.
+destruct H.
+auto.
+auto.
+Qed.
+
+
+
+Lemma Create_Filename_ : forall file_st file_name
+
+(*rename and delete are not ready*)
