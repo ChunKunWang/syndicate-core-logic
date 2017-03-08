@@ -264,7 +264,7 @@ auto.                                                         (* compute *)
 auto.                                                         (* solve the current goal *)
 Qed.
 
-
+(* Proof: truncate operation doesn't change the existing file name in the file system *)
 Lemma Truncate_Doesnot_Change_Filename : forall file_st file_name length, match FS_Truncate_Main file_name length file_st with 
                                                     | None => True (* truncate fail means always true *)
                                                     | Some new_st => Return_All_Filename new_st = Return_All_Filename file_st 
@@ -290,6 +290,7 @@ reflexivity.
 auto.
 Qed.
 
+(* Proof: truncate operation doesn't violate the property that all filenames are unique *)
 Lemma Check_Truncate : forall file_st file_name length, Return_Filename_Unique file_st -> match FS_Truncate_Main file_name length file_st with 
                                                                | None => True (* truncate fail means always true *)
                                                                | Some a => Return_Filename_Unique a
@@ -334,10 +335,12 @@ reflexivity.                           (* equal to *)
 auto.                                  (* solve the current goal *)
 Qed.
 
-Lemma Create_NewOne_notSame_inFileSys : forall file_st file_name, Return_Filename_Unique file_st -> match FS_Create_Main file_name file_st with 
+(* Proof: create operation always create unique filename in the existing file system *)
+(* why "Return_Filename_Unique file_st ->" ? *)
+Lemma Create_UniqueOne_inFileSys : forall file_st file_name, match FS_Create_Main file_name file_st with 
                                                              | None => True (* truncate fail means always true *)
                                                              | Some a => Check_UniqueFile_FileList file_name (Return_All_Filename file_st)
-                                                           end. (* all filenames are unique after write operation *)
+                                                           end. (* all filenames are unique after create operation *)
 intros.
 destruct file_st.
 simpl.
@@ -353,17 +356,58 @@ simpl.
 split.
 auto.
 apply IHfs_st0.
-unfold Return_Filename_Unique in H.
-simpl in H.
-unfold Return_Filename_Unique.
-simpl.
-destruct H.
 auto.
+Qed.
+
+(* Proof: created file is always append and unique *)
+Lemma Create_File_AppendUnique : forall file_st file_name, match FS_Create_Main file_name file_st with
+                                    | None => True (* truncate fail means always true *)
+                                    | Some new_st => Check_UniqueFile_FileList file_name (Return_All_Filename file_st) /\ Visit_FS_Append (Return_All_Filename file_st) file_name = Return_All_Filename new_st
+                                  end. (* all filenames are unique after create operation *)
+intros.
+pose Check_Create_Append.
+specialize (y file_st file_name).
+pose Create_UniqueOne_inFileSys.
+specialize (y0 file_st file_name).
+destruct (FS_Create_Main file_name file_st).
+tauto.
 auto.
 Qed.
 
 
-
-Lemma Create_Filename_ : forall file_st file_name
+(* Proof: create operation doesn't violate the property that all filenames are unique *)
+Lemma Check_Create : forall old_string_list file_name, Check_UniqueFile_FileList file_name old_string_list ->
+                                                       Check_UniqueFile_Allfilename old_string_list -> 
+                                                       Check_UniqueFile_Allfilename (Visit_FS_Append old_string_list file_name).                                  
+intros.
+induction old_string_list.
+simpl.
+tauto.
+simpl.
+simpl in H.
+simpl in H0.
+split.
+destruct H0.
+destruct H.
+clear H1 H2 IHold_string_list.
+induction old_string_list.
+simpl.
+split.
+intro.
+apply H.
+symmetry.
+assumption.
+auto.
+simpl.
+simpl in H0.
+destruct H0.
+split.
+assumption.
+apply IHold_string_list.
+assumption.
+apply IHold_string_list.
+tauto.
+tauto.
+Qed.
 
 (*rename and delete are not ready*)
