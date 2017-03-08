@@ -177,18 +177,18 @@ Definition FS_Truncate_Main (file_name : string) (new_len : nat) (file_st : File
   end.
 
 
-Fixpoint Visit_FS (file_st : list (string * list bool)) : list string :=
+Fixpoint Return_List_String (file_st : list (string * list bool)) : list string :=
   match file_st with
     | [] => []
     | hd::tl => match hd with
-                  | (name, content) => (name::Visit_FS tl)
+                  | (name, content) => (name::Return_List_String tl)
                 end
   end.
 
 (* retrieve all filenames from the file system *)
 Definition Return_All_Filename (file_st : FileSystemState) : list string :=
   match file_st with
-    | file_sys_st st => Visit_FS st
+    | file_sys_st st => Return_List_String st
   end.
 
 (* Proof: write operation doesn't change the existing file name in the file system *)
@@ -217,35 +217,35 @@ reflexivity.                               (* equal to *)
 auto.                                      (* solve the current goal *)
 Qed.
 
-(* check new filename append to the file system *)
-Fixpoint Visit_FS_Append (file_list : list string) (filename : string) : list string :=
-  match file_list with
-    | [] => [filename]
-    | hd::tl => hd::Visit_FS_Append tl filename
+(* check new string append to the current list of string *)
+Fixpoint New_String_Append (list_string : list string) (new_string : string) : list string :=
+  match list_string with
+    | [] => [new_string]
+    | hd::tl => hd::New_String_Append tl new_string
   end.
 
-(* Compare every filename of the file list in the way of bubble sort *)
-Fixpoint Check_UniqueFile_FileList (file_name : string) (file_st : list string) : Prop :=
-  match file_st with
+(* Compare new string to the strings of the list strings in the way of bubble sort *)
+Fixpoint Check_StringUnique_List (new_string : string) (list_string : list string) : Prop :=
+  match list_string with
     | [] => True
-    | hd::tl => ~(file_name = hd) /\ Check_UniqueFile_FileList file_name tl
+    | hd::tl => ~(new_string = hd) /\ Check_StringUnique_List new_string tl
   end.
 
-(* check all filenames are unique when input is the file list; OUF means Only_Unique_Filename *)
-Fixpoint Check_UniqueFile_Allfilename (file_st : list string) : Prop :=
-  match file_st with
+(* check all strings are unique in the list strings *)
+Fixpoint Check_AllStringUnique_List (list_string : list string) : Prop :=
+  match list_string with
     | [] => True
-    | hd::tl => Check_UniqueFile_FileList hd tl /\ Check_UniqueFile_Allfilename tl
+    | hd::tl => Check_StringUnique_List hd tl /\ Check_AllStringUnique_List tl
   end.
 
 (* check all filenames are unique when input is FileSystemState *)
-Definition Return_Filename_Unique (file_st : FileSystemState) : Prop :=
-  Check_UniqueFile_Allfilename (Return_All_Filename file_st).
+Definition Check_Filename_Unique (file_st : FileSystemState) : Prop :=
+  Check_AllStringUnique_List (Return_All_Filename file_st).
 
 (* Proof: write operation doesn't violate the property that all filenames are unique *)
-Lemma Check_Write : forall file_st file_name offset content, Return_Filename_Unique file_st -> match FS_Write_Main file_name offset content file_st with 
+Lemma Check_Write : forall file_st file_name offset content, Check_Filename_Unique file_st -> match FS_Write_Main file_name offset content file_st with 
                                                                | None => True (* write fail means always true *)
-                                                               | Some a => Return_Filename_Unique a
+                                                               | Some a => Check_Filename_Unique a
                                                              end. (* all filenames are unique after write operation *)
 intros.                                                       (* introduce inductive definition *)
 destruct file_st.                                             (* destruct inductive data type for file_st become fs_st0 *)
@@ -255,9 +255,9 @@ specialize (y (file_sys_st fs_st0) file_name offset content). (* bring concrete 
 simpl in y.                                                   (* compute for y*)
 destruct (FS_Write file_name offset content fs_st0).          (* instantiate FS_write into its cases *)
 simpl in y.                                                   (* compute for y *)
-unfold Return_Filename_Unique.                                (* bring function in *)
+unfold Check_Filename_Unique.                                 (* bring function in *)
 unfold Return_All_Filename.                                   (* can be replaced by simpl *)
-unfold Return_Filename_Unique in H.                           (* bring function in H *)
+unfold Check_Filename_Unique in H.                            (* bring function in H *)
 unfold Return_All_Filename in H.                              (* can be replace by simpl in H *)
 rewrite y.                                                    (* apply y into our goal *)
 auto.                                                         (* compute *)
@@ -291,9 +291,9 @@ auto.
 Qed.
 
 (* Proof: truncate operation doesn't violate the property that all filenames are unique *)
-Lemma Check_Truncate : forall file_st file_name length, Return_Filename_Unique file_st -> match FS_Truncate_Main file_name length file_st with 
+Lemma Check_Truncate : forall file_st file_name length, Check_Filename_Unique file_st -> match FS_Truncate_Main file_name length file_st with 
                                                                | None => True (* truncate fail means always true *)
-                                                               | Some a => Return_Filename_Unique a
+                                                               | Some a => Check_Filename_Unique a
                                                              end. (* all filenames are unique after write operation *)
 intros.
 destruct file_st.
@@ -303,9 +303,9 @@ specialize (y (file_sys_st fs_st0) file_name length).
 simpl in y.
 destruct (FS_Truncate file_name length fs_st0).
 simpl in y.
-unfold Return_Filename_Unique.
+unfold Check_Filename_Unique.
 unfold Return_All_Filename.
-unfold Return_Filename_Unique in H.
+unfold Check_Filename_Unique in H.
 unfold Return_All_Filename in H.
 rewrite y.
 auto.
@@ -315,7 +315,7 @@ Qed.
 (* Proof: create operation always append new filename in the end *)
 Lemma Check_Create_Append: forall file_st file_name, match FS_Create_Main file_name file_st with
                                     | None => True (* create fail means always true *)
-                                    | Some new_st => Visit_FS_Append (Return_All_Filename file_st) file_name = Return_All_Filename new_st
+                                    | Some new_st => New_String_Append (Return_All_Filename file_st) file_name = Return_All_Filename new_st
                                   end. (* new and old file names in file system remain the same *)
 intros.                                (* introduce inductive definition *)
 destruct file_st.                      (* destruct inductive data type for file_st become fs_st0 *)
@@ -336,10 +336,9 @@ auto.                                  (* solve the current goal *)
 Qed.
 
 (* Proof: create operation always create unique filename in the existing file system *)
-(* why "Return_Filename_Unique file_st ->" ? *)
 Lemma Create_UniqueOne_inFileSys : forall file_st file_name, match FS_Create_Main file_name file_st with 
                                                              | None => True (* truncate fail means always true *)
-                                                             | Some a => Check_UniqueFile_FileList file_name (Return_All_Filename file_st)
+                                                             | Some a => Check_StringUnique_List file_name (Return_All_Filename file_st)
                                                            end. (* all filenames are unique after create operation *)
 intros.
 destruct file_st.
@@ -362,7 +361,7 @@ Qed.
 (* Proof: created file is always append and unique *)
 Lemma Create_File_AppendUnique : forall file_st file_name, match FS_Create_Main file_name file_st with
                                     | None => True (* truncate fail means always true *)
-                                    | Some new_st => Check_UniqueFile_FileList file_name (Return_All_Filename file_st) /\ Visit_FS_Append (Return_All_Filename file_st) file_name = Return_All_Filename new_st
+                                    | Some new_st => Check_StringUnique_List file_name (Return_All_Filename file_st) /\ New_String_Append (Return_All_Filename file_st) file_name = Return_All_Filename new_st
                                   end. (* all filenames are unique after create operation *)
 intros.
 pose Check_Create_Append.
@@ -376,9 +375,9 @@ Qed.
 
 
 (* Proof: create operation doesn't violate the property that all filenames are unique *)
-Lemma Check_Create : forall old_string_list file_name, Check_UniqueFile_FileList file_name old_string_list ->
-                                                       Check_UniqueFile_Allfilename old_string_list -> 
-                                                       Check_UniqueFile_Allfilename (Visit_FS_Append old_string_list file_name).                                  
+Lemma Check_Create : forall old_string_list file_name, Check_StringUnique_List file_name old_string_list ->
+                                                       Check_AllStringUnique_List old_string_list -> 
+                                                       Check_AllStringUnique_List (New_String_Append old_string_list file_name).                                  
 intros.
 induction old_string_list.
 simpl.
