@@ -111,7 +111,7 @@ Fixpoint FS_Delete (file_name : string) (file_st : list (string * list bool)) : 
 
 Definition FS_Delete_Main (file_name : string) (file_st : FileSystemState) : option FileSystemState :=
   match file_st with
-    | file_sys_st st => match FS_Create file_name st with
+    | file_sys_st st => match FS_Delete file_name st with
                           | None => None
                           | Some new => Some (file_sys_st new)
                         end
@@ -373,40 +373,103 @@ tauto.
 auto.
 Qed.
 
-
-(* Proof: create operation doesn't violate the property that all filenames are unique *)
-Lemma Check_Create : forall old_string_list file_name, Check_StringUnique_List file_name old_string_list ->
+(* Proof: New_String_Append func doesn't violate the property that all strings are unique *)
+(* 1. The new string is diffent from any string in the esisting string list *)
+(* 2. The strings in the existing string list are unique *)
+Lemma Check_CreatedString : forall old_string_list file_name, Check_StringUnique_List file_name old_string_list ->
                                                        Check_AllStringUnique_List old_string_list -> 
                                                        Check_AllStringUnique_List (New_String_Append old_string_list file_name).                                  
+intros.                                 (* introduce inductive definition *)
+induction old_string_list.              (* instantiate old_string_list into two cases *)
+simpl.                                  
+tauto.                                  (* prove true *)
+simpl.                                  
+simpl in H.                             
+simpl in H0.                            
+split.                                  (* split goal into two cases *)
+destruct H0.                            (* break H0 down *)
+destruct H.                             (* break H down *)
+clear H1 H2 IHold_string_list.          (* clear hypothesis, but why? *)
+induction old_string_list.              (* instantiate old_string_list into two cases *)
+simpl.                                  
+split.                                  (* split goal into two cases *)
+intro.                                  (* same as hypothesis *)
+apply H.                                (* ?? *)
+symmetry.                               (* form t = u to u = t *)
+assumption.                             (* type is equal to the goal *)
+auto.                                   
+simpl.                                  
+simpl in H0.                            
+destruct H0.                            (* break H0 down *)
+split.                                  (* split goal into two cases *)
+assumption.                             (* type is equal to the goal *)
+apply IHold_string_list.                (* become the precondition *)
+assumption.                             (* type is equal to the goal, H1 *)
+apply IHold_string_list.                (* become the precondition *)
+tauto.                                  (* ?? *)
+tauto.                                  (* ?? *)
+Qed.   
+
+Lemma Check_Create : forall file_st file_name, Check_Filename_Unique file_st -> match FS_Create_Main file_name file_st with
+                                    | None => True (* truncate fail means always true *)
+                                    | Some new_st => Check_AllStringUnique_List (Return_All_Filename new_st)
+                                  end. (* all filenames are unique after create operation *)
 intros.
-induction old_string_list.
-simpl.
-tauto.
-simpl.
-simpl in H.
-simpl in H0.
-split.
-destruct H0.
-destruct H.
-clear H1 H2 IHold_string_list.
-induction old_string_list.
-simpl.
-split.
-intro.
-apply H.
-symmetry.
+pose Create_File_AppendUnique.
+specialize (y file_st file_name).
+destruct (FS_Create_Main file_name file_st).
+destruct y.
+rewrite <- H1.
+apply Check_CreatedString.
+assumption.
 assumption.
 auto.
-simpl.
-simpl in H0.
-destruct H0.
-split.
-assumption.
-apply IHold_string_list.
-assumption.
-apply IHold_string_list.
-tauto.
-tauto.
 Qed.
+
+
+(* delete a string from the current list of string *)
+Fixpoint Delete_String_List (list_string : list string) (delete_name : string) : list string :=
+  match list_string with
+    | [] => []
+    | hd::tl => if string_dec delete_name hd then tl
+                                             else hd::Delete_String_List tl delete_name
+  end.
+
+(* Proof: delete operation doesn't change the existing file name in the file system *)
+Lemma Delete_Doesnot_Change_Filename : forall file_st file_name, match FS_Delete_Main file_name file_st with
+                                    | None => True (* delete fail means always true *)
+                                    | Some new_st => Delete_String_List (Return_All_Filename file_st) file_name = Return_All_Filename new_st
+                                  end. (* rest filenames doesn't change  *)
+intros.
+destruct file_st.
+simpl.
+induction fs_st0.
+simpl.
+auto.
+simpl.
+destruct a.
+simpl.
+destruct (string_dec file_name s).
+reflexivity.
+destruct (FS_Delete file_name fs_st0).
+rewrite IHfs_st0.
+reflexivity.
+auto.
+Qed.
+
+(* Proof: a list of string still unique after delete one string *)
+Lemma 
+
+
+Lemma Check_Delete : forall file_st file_name, Check_Filename_Unique file_st -> match FS_Delete_Main file_name file_st with
+                                    | None => True (* truncate fail means always true *)
+                                    | Some new_st => Check_AllStringUnique_List (Return_All_Filename new_st)
+                                  end. (* all filenames are unique after delete operation *)
+intros.
+pose Delete_Doesnot_Change_Filename.
+specialize (y file_st file_name).
+destruct (FS_Delete_Main file_name file_st).
+rewrite <- y.
+simpl.
 
 (*rename and delete are not ready*)
