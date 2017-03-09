@@ -410,6 +410,7 @@ tauto.                                  (* ?? *)
 tauto.                                  (* ?? *)
 Qed.   
 
+(* Proof: create operation doesn't violate the property that all filenames are unique *)
 Lemma Check_Create : forall file_st file_name, Check_Filename_Unique file_st -> match FS_Create_Main file_name file_st with
                                     | None => True (* truncate fail means always true *)
                                     | Some new_st => Check_AllStringUnique_List (Return_All_Filename new_st)
@@ -458,9 +459,24 @@ auto.
 Qed.
 
 (* Proof: a list of string still unique after delete one string *)
-Lemma 
+Lemma StringsUnique_AfterDelete : forall old_string_list file_name, Check_AllStringUnique_List old_string_list ->
+                                                          Check_AllStringUnique_List (Delete_String_List old_string_list file_name).
+intros.
+induction old_string_list.
+simpl.
+auto.
+simpl.
+destruct (string_dec file_name a).
+simpl in H.
+destruct H.
+assumption.
+simpl.
+split.
+destruct n.
+symmetry.
 
 
+(* Proof: delete operation doesn't violate the property that all filenames are unique *)
 Lemma Check_Delete : forall file_st file_name, Check_Filename_Unique file_st -> match FS_Delete_Main file_name file_st with
                                     | None => True (* truncate fail means always true *)
                                     | Some new_st => Check_AllStringUnique_List (Return_All_Filename new_st)
@@ -469,7 +485,7 @@ intros.
 pose Delete_Doesnot_Change_Filename.
 specialize (y file_st file_name).
 destruct (FS_Delete_Main file_name file_st).
-rewrite <- y.
+rewrite <- y. (* subgoal: Check_AllStringUnique_List(Delete_String_List (Return_All_Filename file_st) file_name) *)
 simpl.
 
 (*rename and delete are not ready*)
