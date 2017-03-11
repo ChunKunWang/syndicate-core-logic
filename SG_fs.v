@@ -121,7 +121,7 @@ Fixpoint FS_Rename (old_file_name : string) (new_file_name : string) (file_st : 
   match file_st with
     | nil => None
     | hd::tl => match hd with
-                  | (name, content) => if string_dec new_file_name name then None
+                  | (name, content) => if string_dec new_file_name name then None (* check duplicate filename *)
                                        else if string_dec old_file_name name then match FS_Rename old_file_name new_file_name tl with
                                                                                     | None => None
                                                                                     | Some a => Some ((new_file_name, content)::a)
@@ -394,7 +394,7 @@ induction old_string_list.              (* instantiate old_string_list into two 
 simpl.                                  
 split.                                  (* split goal into two cases *)
 intro.                                  (* same as hypothesis *)
-apply H.                                (* ?? *)
+apply H.                                
 symmetry.                               (* form t = u to u = t *)
 assumption.                             (* type is equal to the goal *)
 auto.                                   
@@ -406,8 +406,8 @@ assumption.                             (* type is equal to the goal *)
 apply IHold_string_list.                (* become the precondition *)
 assumption.                             (* type is equal to the goal, H1 *)
 apply IHold_string_list.                (* become the precondition *)
-tauto.                                  (* ?? *)
-tauto.                                  (* ?? *)
+tauto.                                  
+tauto.                                  
 Qed.   
 
 (* Proof: create operation doesn't violate the property that all filenames are unique *)
@@ -458,6 +458,43 @@ reflexivity.
 auto.
 Qed.
 
+(* Proof: after deleting one string from the string list, the rest strings of the string list are unique *)
+Lemma StringUnique_AfterDeleteOneString : forall old_string_list file_name delete_name, Check_StringUnique_List file_name old_string_list ->
+                                                           Check_StringUnique_List file_name (Delete_String_List old_string_list delete_name).
+intros.
+induction old_string_list.
+simpl.
+auto.
+simpl.
+destruct (string_dec file_name a).
+destruct (string_dec delete_name a).
+simpl in H.
+destruct H.
+assumption.
+simpl.
+split.
+simpl in H.
+destruct H.
+assumption.
+apply IHold_string_list.
+simpl in H.
+destruct H.
+assumption.
+destruct (string_dec delete_name a).
+simpl in H.
+destruct H.
+assumption.
+simpl.
+split.
+simpl in H.
+destruct H.
+assumption.
+apply IHold_string_list.
+simpl in H.
+destruct H.
+assumption.
+Qed.
+
 (* Proof: a list of string still unique after delete one string *)
 Lemma StringsUnique_AfterDelete : forall old_string_list file_name, Check_AllStringUnique_List old_string_list ->
                                                           Check_AllStringUnique_List (Delete_String_List old_string_list file_name).
@@ -472,9 +509,15 @@ destruct H.
 assumption.
 simpl.
 split.
-destruct n.
-symmetry.
-
+simpl in H.
+destruct H.
+apply StringUnique_AfterDeleteOneString.
+assumption.
+apply IHold_string_list.
+simpl in H.
+destruct H.
+assumption.
+Qed.
 
 (* Proof: delete operation doesn't violate the property that all filenames are unique *)
 Lemma Check_Delete : forall file_st file_name, Check_Filename_Unique file_st -> match FS_Delete_Main file_name file_st with
@@ -485,7 +528,96 @@ intros.
 pose Delete_Doesnot_Change_Filename.
 specialize (y file_st file_name).
 destruct (FS_Delete_Main file_name file_st).
-rewrite <- y. (* subgoal: Check_AllStringUnique_List(Delete_String_List (Return_All_Filename file_st) file_name) *)
-simpl.
+rewrite <- y.
+apply StringsUnique_AfterDelete.
+assumption.
+auto.
+Qed.
 
-(*rename and delete are not ready*)
+
+(* rename a string from the current list of string *)
+Fixpoint Rename_aString_inList (old_name : string) (new_name : string) (list_string : list string) : list string :=
+  match list_string with
+    | [] => []
+    | hd::tl => if string_dec new_name hd then hd::tl (* check the duplicate string *)
+                else if string_dec old_name hd then new_name::(Rename_aString_inList old_name new_name tl)
+                else hd::Rename_aString_inList old_name new_name tl
+  end.
+
+(* Proof: rename operation doesn't change the other original file name in the file system *)
+Lemma Rename_Doesnot_Change_Filename : forall old_name new_name file_st, match FS_Rename_Main old_name new_name file_st with
+                                    | None => True (* delete fail means always true *)
+                                    | Some new_st => Rename_aString_inList old_name new_name (Return_All_Filename file_st) = Return_All_Filename new_st
+                                  end. (* the other filenames doesn't change  *)
+intros.
+destruct file_st.
+simpl.
+induction fs_st0.
+simpl.
+auto.
+simpl.
+destruct a.
+destruct (string_dec new_name s).
+auto.
+destruct (string_dec old_name s).
+destruct (FS_Rename old_name new_name fs_st0) eqn:?. (* destruct term but left term's relation *)
+simpl in IHfs_st0.
+simpl.
+destruct (string_dec new_name s).
+contradiction.                                       (* new_name <> s && new_name = s *)
+destruct (string_dec old_name s).
+rewrite IHfs_st0.
+reflexivity.
+contradiction.
+auto.
+destruct (FS_Rename old_name new_name fs_st0).
+simpl.
+destruct (string_dec new_name s).
+contradiction.
+destruct (string_dec old_name s).
+contradiction.
+simpl in IHfs_st0.
+rewrite <- IHfs_st0.
+reflexivity.
+auto.
+Qed.
+
+
+(* Proof: new_name is not in the existing file list *)
+Lemma RenameString_NotInLists : forall old_string new_string list_string, Check_StringUnique_List new_string list_string ->
+                                                  Check_AllStringUnique_List list_string ->
+                                                  Check_StringUnique_List new_string (Rename_aString_inList old_string new_string list_string).
+intros.
+induction list_string.
+simpl.
+auto.
+simpl.
+destruct (string_dec new_string a).
+simpl.
+split.
+simpl in H.
+destruct H.
+contradiction.
+simpl in H.
+destruct H.
+assumption.
+destruct (string_dec old_string a).
+simpl.
+split.  (* new_string <> new_string !? *)
+
+
+(* Check_Filename_Unique file_st -> Check_AllStringUnique_List (Rename_aString_inList old_name new_name (Return_All_Filename file_st)) *)
+Lemma AllString_Unique_AfterRenameAString : forall file_st old_name new_name, Check_Filename_Unique file_st -> 
+                 Check_AllStringUnique_List (Rename_aString_inList old_name new_name (Return_All_Filename file_st)).
+
+(* Proof: rename operation doesn't violate the property that all filenames are unique *)
+Lemma Check_Rename : forall file_st old_name new_name, Check_Filename_Unique file_st -> match FS_Rename_Main old_name new_name file_st with
+                                    | None => True (* rename fail means always true *)
+                                    | Some new_st => Check_AllStringUnique_List (Return_All_Filename new_st)
+                                  end. (* all filenames are unique after rename operation *)
+intros.
+pose Rename_Doesnot_Change_Filename.
+specialize (y old_name new_name file_st).
+destruct (FS_Rename_Main old_name new_name file_st).
+rewrite <- y. 
+
