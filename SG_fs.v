@@ -582,33 +582,58 @@ reflexivity.
 auto.
 Qed.
 
-
-(* Proof: new_name is not in the existing file list *)
-Lemma RenameString_NotInLists : forall old_string new_string list_string, Check_StringUnique_List new_string list_string ->
-                                                  Check_AllStringUnique_List list_string ->
-                                                  Check_StringUnique_List new_string (Rename_aString_inList old_string new_string list_string).
+(* Proof: The NewName of the rename operation is different from the string lists *)
+Lemma NewName_isUnique : forall file_st old_name new_name, Check_Filename_Unique file_st -> match FS_Rename_Main old_name new_name file_st with
+                                    | None => True (* rename fail means always true *)
+                                    | Some new_st => Check_StringUnique_List new_name (Return_All_Filename file_st)
+                                  end.
 intros.
-induction list_string.
+destruct file_st.
+simpl.
+induction fs_st0.
 simpl.
 auto.
 simpl.
-destruct (string_dec new_string a).
+destruct a.
+destruct (string_dec new_name s).
+auto.
+destruct (string_dec old_name s).
+destruct (FS_Rename old_name new_name fs_st0).
 simpl.
 split.
-simpl in H.
-destruct H.
-contradiction.
+assumption.
+apply IHfs_st0.
+unfold Check_Filename_Unique.
+unfold Check_Filename_Unique in H.
 simpl in H.
 destruct H.
 assumption.
-destruct (string_dec old_string a).
+auto.
+destruct (FS_Rename old_name new_name fs_st0).
 simpl.
-split.  (* new_string <> new_string !? *)
+split.
+assumption.
+apply IHfs_st0.
+unfold Check_Filename_Unique.
+unfold Check_Filename_Unique in H.
+simpl in H.
+destruct H.
+assumption.
+auto.
+Qed.
 
+(* All strings are unique after rename operation *)
+Lemma AllString_Unique_AfterRenameAString : forall file_st old_name new_name, Check_Filename_Unique file_st -> match FS_Rename_Main old_name new_name file_st with
+                          | None => True (* rename fail means always true *)
+                          | Some new_st => Check_AllStringUnique_List (Rename_aString_inList old_name new_name (Return_All_Filename file_st))
+                        end.
+intros.
+pose NewName_isUnique.
+specialize (y file_st old_name new_name).
+destruct (FS_Rename_Main old_name new_name file_st).
+destruct file_st.
+simpl.
 
-(* Check_Filename_Unique file_st -> Check_AllStringUnique_List (Rename_aString_inList old_name new_name (Return_All_Filename file_st)) *)
-Lemma AllString_Unique_AfterRenameAString : forall file_st old_name new_name, Check_Filename_Unique file_st -> 
-                 Check_AllStringUnique_List (Rename_aString_inList old_name new_name (Return_All_Filename file_st)).
 
 (* Proof: rename operation doesn't violate the property that all filenames are unique *)
 Lemma Check_Rename : forall file_st old_name new_name, Check_Filename_Unique file_st -> match FS_Rename_Main old_name new_name file_st with
