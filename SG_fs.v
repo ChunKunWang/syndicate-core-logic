@@ -264,6 +264,36 @@ auto.                                                         (* compute *)
 auto.                                                         (* solve the current goal *)
 Qed.
 
+(** FS_Read_Main_2 return same file_st *)
+Definition FS_Read_Main_2 (file_name : string) (offset : nat) (file_st : FileSystemState) : FileSystemState :=
+  match file_st with
+    | file_sys_st a => file_sys_st a
+  end.
+
+(* Proof: Always read latest written file *)
+Lemma Read_Latest_Data : forall file_st file_name offset content, Check_Filename_Unique file_st -> match FS_Write_Main file_name offset content file_st with 
+                                                               | None => True (* write fail means always true *)
+                                                               | Some a => FS_Read_Main_2 file_name offset a = a
+                                                             end.
+intros.
+destruct file_st.
+simpl.
+induction fs_st0.
+simpl.
+auto.
+simpl.
+destruct a.
+destruct (string_dec file_name s).
+destruct (write_content l offset content).
+simpl.
+reflexivity.
+auto.
+destruct (FS_Write file_name offset content fs_st0).
+simpl.
+reflexivity.
+auto.
+Qed.
+
 (* Proof: truncate operation doesn't change the existing file name in the file system *)
 Lemma Truncate_Doesnot_Change_Filename : forall file_st file_name length, match FS_Truncate_Main file_name length file_st with 
                                                     | None => True (* truncate fail means always true *)
