@@ -89,14 +89,23 @@ Definition get_req (c : InputStream) (cont : SG_req -> proc) : proc :=
 
 (* a -> b -> c => a * b -> c*)
 
-Definition server (i:chan (nat * (chan nat true)) false) : proc := 
+Definition sample_server (i:chan (nat * (chan nat true)) false) : proc := 
     rinP i (fun ar => let a := fst ar in let r := snd ar in OutAtom r (plus a 1)).
 
-Definition client (i:chan (nat * (chan nat true)) false) (o:chan nat true) : proc :=
+Definition sample_client (i:chan (nat * (chan nat true)) false) (o:chan nat true) : proc :=
     nuPl (fun r => parP (OutAtom i (0,r)) (inP r (fun x => OutAtom o x))).
 
-Definition Run (i : chan (nat * (chan nat true)) false) (o : chan nat true) := 
-  (parP (server i) (client i o)).
+Definition sample_Run (i : chan (nat * (chan nat true)) false) (o : chan nat true) := 
+  (parP (sample_server i) (sample_client i o)).
 
+
+Definition server (i:chan (md_HTTP_connection_data * (chan nat true)) false) : proc := 
+    rinP i (fun ar => let a := fst ar in let r := snd ar in OutAtom r O).
+
+Definition client (req : md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan nat true)) false) (o:chan nat true) : proc :=
+    nuPl (fun r => parP (OutAtom i (req,r)) (inP r (fun x => OutAtom o x))).
+
+Definition Run (req : md_HTTP_connection_data) (i : chan (md_HTTP_connection_data * (chan nat true)) false) (o : chan nat true) := 
+  (parP (server i) (client req i o)).
 
 
