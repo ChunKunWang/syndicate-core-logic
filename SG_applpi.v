@@ -5,6 +5,7 @@ Require Import libapplpi.
 Require Import SG_applpi_string.
 Require Import SG_fs.
 Require Import Coq.FSets.FMapList.
+Require Import Coq.Strings.String.
 
 (** Result channel *)
 Axiom result_chan : chan unit false.
@@ -25,25 +26,28 @@ Definition may_fail := nuP
 (** Manifest data plane *)
 (* c.f. protobufs/sg.proto: l.44-60 *)
 Record Manifest : Set := manifest
-  { volume_id : String;
-    owner_id : String;
-    file_id : String;
-    size : String}.
+  { volume_id : string;
+    owner_id : string;
+    file_id : string;
+    size : string}.
 
 (** Definition of Syndicate requests from client *)
 (* c.f. protobufs/sg.proto: l.80-94 *)
 Inductive SG_req : Set :=
-  | req_write : String -> SG_req
-  | req_truncate: String -> SG_req
-  | req_detach: String -> SG_req
-  | req_rename: String -> SG_req
-  | req_putchunks: String -> SG_req
-  | req_deletechunks: String -> SG_req
-  | req_setxattr: String -> SG_req
-  | req_removexattr: String -> SG_req
-  | req_reload: String -> SG_req
-  | req_refresh: String -> SG_req
-  | req_rename_hint: String -> SG_req.
+  | req_write : string -> SG_req
+  | req_truncate: string -> SG_req
+  | req_detach: string -> SG_req
+  | req_rename: string -> SG_req
+  | req_putchunks: string -> SG_req
+  | req_deletechunks: string -> SG_req
+  | req_setxattr: string -> SG_req
+  | req_removexattr: string -> SG_req
+  | req_reload: string -> SG_req
+  | req_refresh: string -> SG_req
+  | req_rename_hint: string -> SG_req.
+
+Record md_HTTP_connection_data : Set := con_data
+  { header_message : SG_req}.
 
 Definition InputStream : Set := chan SG_req true.
 
@@ -82,5 +86,17 @@ Definition reply (r : RespMsg) (c : OutputStream) (cont : proc) : proc :=
 
 Definition get_req (c : InputStream) (cont : SG_req -> proc) : proc :=
   c ?? cont.
+
+(* a -> b -> c => a * b -> c*)
+
+Definition server (i:chan (nat * (chan nat true)) false) : proc := 
+    rinP i (fun ar => let a := fst ar in let r := snd ar in OutAtom r (plus a 1)).
+
+Definition client (i:chan (nat * (chan nat true)) false) (o:chan nat true) : proc :=
+    nuPl (fun r => parP (OutAtom i (0,r)) (inP r (fun x => OutAtom o x))).
+
+Definition Run (i : chan (nat * (chan nat true)) false) (o : chan nat true) := 
+  (parP (server i) (client i o)).
+
 
 
