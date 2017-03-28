@@ -99,13 +99,30 @@ Definition sample_Run (i : chan (nat * (chan nat true)) false) (o : chan nat tru
   (parP (sample_server i) (sample_client i o)).
 
 
-Definition server (i:chan (md_HTTP_connection_data * (chan nat true)) false) : proc := 
-    rinP i (fun ar => let a := fst ar in let r := snd ar in OutAtom r O).
+Definition server (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) : proc := 
+    rinP i (fun ar => let a := fst ar in let r := snd ar in 
+                        match a with 
+                          | con_data msg => match msg with
+                                            | req_write request => OutAtom r resp_write
+                                            | req_truncate request => OutAtom r resp_truncate
+                                            | req_detach request => OutAtom r resp_detach
+                                            | req_rename request => OutAtom r resp_rename
+                                            | req_putchunks request => OutAtom r resp_putchunks
+                                            | req_deletechunks request => OutAtom r resp_deletechunks
+                                            | req_setxattr request => OutAtom r resp_setxattr
+                                            | req_removexattr request => OutAtom r resp_removexattr
+                                            | req_reload request => OutAtom r resp_reload
+                                            | req_refresh request => OutAtom r resp_refresh
+                                            | req_rename_hint request => OutAtom r resp_rename_hint
+                                          end
+                          end).
 
-Definition client (req : md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan nat true)) false) (o:chan nat true) : proc :=
+Definition client (req : md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o:chan RespMsg true) : proc :=
     nuPl (fun r => parP (OutAtom i (req,r)) (inP r (fun x => OutAtom o x))).
 
-Definition Run (req : md_HTTP_connection_data) (i : chan (md_HTTP_connection_data * (chan nat true)) false) (o : chan nat true) := 
+Definition Run (req : md_HTTP_connection_data) (i : chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o : chan RespMsg true) := 
   (parP (server i) (client req i o)).
+
+
 
 
