@@ -117,10 +117,10 @@ Definition server (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false)
                                           end
                           end).
 
-Definition client (req : md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o:chan RespMsg true) : proc :=
+Definition client (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o:chan RespMsg true) : proc :=
     nuPl (fun r => parP (OutAtom i (req,r)) (inP r (fun x => OutAtom o x))).
 
-Definition Run (req : md_HTTP_connection_data) (i : chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o : chan RespMsg true) := 
+Definition Run (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o:chan RespMsg true) := 
   (parP (server i) (client req i o)).
 
 
