@@ -264,20 +264,27 @@ auto.                                                         (* compute *)
 auto.                                                         (* solve the current goal *)
 Qed.
 
-(** FS_Read_Main_2 return same file_st *)
-Definition FS_Read_Main_2 (file_name : string) (offset : nat) (file_st : FileSystemState) : FileSystemState :=
-  match file_st with
-    | file_sys_st a => file_sys_st a
-  end.
-
-(* Proof: Always read latest written file *)
+(* Proof: Always read latest written file - 
+   A content c, written by write operation to a file_name f with a offset o,
+   is the same as read operation return by reading f with o *)
 Lemma Read_Latest_Data : forall file_st file_name offset content, Check_Filename_Unique file_st -> match FS_Write_Main file_name offset content file_st with 
                                                                | None => True (* write fail means always true *)
-                                                               | Some a => FS_Read_Main_2 file_name offset a = a
+                                                               | Some a => match FS_Read_Main file_name offset a with
+                                                                             | None => True
+                                                                             | Some return_content => return_content = content
+                                                                           end
                                                              end.
 intros.
 destruct file_st.
 simpl.
+pose Check_Write.
+specialize (y (file_sys_st fs_st0) file_name offset content).
+simpl in y.
+destruct (FS_Write file_name offset content fs_st0).
+simpl.
+destruct (FS_Read file_name offset l).
+
+
 induction fs_st0.
 simpl.
 auto.
@@ -286,13 +293,9 @@ destruct a.
 destruct (string_dec file_name s).
 destruct (write_content l offset content).
 simpl.
-reflexivity.
-auto.
-destruct (FS_Write file_name offset content fs_st0).
-simpl.
-reflexivity.
-auto.
-Qed.
+destruct (string_dec file_name s).
+destruct (return_offset l0 offset).
+
 
 (* Proof: truncate operation doesn't change the existing file name in the file system *)
 Lemma Truncate_Doesnot_Change_Filename : forall file_st file_name length, match FS_Truncate_Main file_name length file_st with 
