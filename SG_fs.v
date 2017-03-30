@@ -47,7 +47,10 @@ Fixpoint write_content (content : list bool) (offset : nat) (new_content : bool)
            end
     | S rest => match content with
                   | [] => None (* if the file doesn't have enough sapce, do nothing *)
-                  | a :: t => write_content t rest new_content
+                  | a :: t => match write_content t rest new_content with
+                                | None => None
+                                | Some b => Some (a :: b)
+                              end
                  end 
   end.
 
@@ -264,10 +267,64 @@ auto.                                                         (* compute *)
 auto.                                                         (* solve the current goal *)
 Qed.
 
+(* ref: https://github.com/xu-hao/CertifiedQueryArrow/blob/master/Algebra/Utils.v Line:491 *)
+Section NatListDoubleInductionPrinciple.
+    Variable
+      (T : Type)
+      (P : nat ->  list T  -> Prop)
+      (onil : P 0   nil)
+      (ocons : forall a b, P 0 b -> P 0 (a :: b))
+      (snil : forall b, P b List.nil -> P (S b) List.nil)
+      (scons : forall b c d, P b d -> P (S b) (c :: d)).
+    
+    Fixpoint nat_list_ind_2
+             (l1 : nat) ( l2 : list T) : P l1 l2 :=
+      match l1 in nat return P l1 l2 with
+        | 0 =>
+          (fix h' (l2' : list T) : P 0 l2' :=
+             match l2' with
+               | List.nil => onil
+               | a :: b => ocons a b (h' b)
+             end) l2
+        | S b =>
+          (fix h' (l2' : list T) : P (S b) l2' :=
+             match l2' with
+               | List.nil => snil b (nat_list_ind_2 b nil)
+               | c :: d => scons b c d (nat_list_ind_2 b d)
+             end) l2
+      end
+    .
+End NatListDoubleInductionPrinciple.
+
+(* Proof: check written content by write_content is the same as the content returned by return_offset *)
+Lemma check_written_content_sameas_newcontent: forall list_content offset content, match write_content list_content offset content with
+                                                                      | None => True
+                                                                      | Some a => return_offset a offset = Some content
+                                                                      end.
+intros.
+generalize offset list_content.
+clear list_content offset.
+apply nat_list_ind_2.
+simpl.
+reflexivity.
+intros.
+simpl.
+auto.
+intros.
+simpl.
+auto.
+intros.
+simpl.
+destruct (write_content d b content).
+simpl.
+assumption.
+auto.
+Qed.
+
 (* Proof: Always read latest written file - 
    A content c, written by write operation to a file_name f with a offset o,
    is the same as read operation return by reading f with o *)
-Lemma Read_Latest_Data : forall file_st file_name offset content, Check_Filename_Unique file_st -> match FS_Write_Main file_name offset content file_st with 
+Lemma Read_Latest_Data : forall file_st file_name offset content, match FS_Write_Main file_name offset content file_st with 
                                                                | None => True (* write fail means always true *)
                                                                | Some a => match FS_Read_Main file_name offset a with
                                                                              | None => True
@@ -277,25 +334,29 @@ Lemma Read_Latest_Data : forall file_st file_name offset content, Check_Filename
 intros.
 destruct file_st.
 simpl.
-pose Check_Write.
-specialize (y (file_sys_st fs_st0) file_name offset content).
-simpl in y.
-destruct (FS_Write file_name offset content fs_st0).
-simpl.
-destruct (FS_Read file_name offset l).
-
-
 induction fs_st0.
 simpl.
 auto.
 simpl.
 destruct a.
 destruct (string_dec file_name s).
-destruct (write_content l offset content).
+destruct (write_content l offset content) eqn: H.
+simpl.
+destruct (string_dec file_name s). (* write_content l offset content = Some l0, match return_offset l0 offset with *)
+pose check_written_content_sameas_newcontent.
+specialize (y l offset content).
+rewrite H in y.
+rewrite y.
+reflexivity.
+contradiction.
+auto.
+destruct (FS_Write file_name offset content fs_st0).
 simpl.
 destruct (string_dec file_name s).
-destruct (return_offset l0 offset).
-
+contradiction.
+assumption.
+auto.
+Qed.
 
 (* Proof: truncate operation doesn't change the existing file name in the file system *)
 Lemma Truncate_Doesnot_Change_Filename : forall file_st file_name length, match FS_Truncate_Main file_name length file_st with 
