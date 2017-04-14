@@ -6,6 +6,7 @@ Require Import SG_applpi_string.
 Require Import SG_fs.
 Require Import Coq.FSets.FMapList.
 Require Import Coq.Strings.String.
+Import ListNotations.
 
 (** Result channel *)
 Axiom result_chan : chan unit false.
@@ -122,6 +123,37 @@ Definition client (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data
 
 Definition Run (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o:chan RespMsg true) := 
   (parP (server i) (client req i o)).
+
+(** Syndicate Server State: contain a list of SGstate as a logical time *)
+Record SGServerState : Set := sg_server_st
+  {server_st : list bool}.
+
+Fixpoint PlusOne (n : nat) : nat :=
+  match n with
+    | O => S O
+    | S n' => S (PlusOne n')
+  end.
+
+Fixpoint Create_ServerState (SerStatus : bool) (server_st : list bool) : option (list bool) :=
+  match server_st with
+    | [] => Some [SerStatus]
+    | hd::tl => match Create_ServerState SerStatus tl with
+                  | None => None
+                  | Some a => Some (hd::a)
+                end
+  end.
+
+Definition Update_Server_State (server_status : bool) (SG_server : SGServerState) : option SGServerState :=
+  match SG_server with
+    | sg_server_st st => match Create_ServerState server_status st with
+                          | None => None
+                          | Some new => Some (sg_server_st new)
+                        end
+  end.
+
+
+
+
 
 
 
