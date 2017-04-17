@@ -35,7 +35,7 @@ Record Manifest : Set := manifest
 (** Definition of Syndicate requests from client *)
 (* c.f. protobufs/sg.proto: l.80-94 *)
 Inductive SG_req : Set :=
-  | req_write : string -> SG_req
+  | req_write : string -> nat -> bool -> SG_req
   | req_truncate: string -> SG_req
   | req_detach: string -> SG_req
   | req_rename: string -> SG_req
@@ -100,7 +100,7 @@ Definition sample_Run (i : chan (nat * (chan nat true)) false) (o : chan nat tru
   (parP (sample_server i) (sample_client i o)).
 
 
-Definition server (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) : proc := 
+(*Definition server (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) : proc := 
     rinP i (fun ar => let a := fst ar in let r := snd ar in 
                         match a with 
                           | con_data msg => match msg with
@@ -123,16 +123,10 @@ Definition client (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data
 
 Definition Run (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o:chan RespMsg true) := 
   (parP (server i) (client req i o)).
-
+*)
 (** Syndicate Server State: contain a list of SGstate as a logical time *)
 Record SGServerState : Set := sg_server_st
   {server_st : list bool}.
-
-Fixpoint PlusOne (n : nat) : nat :=
-  match n with
-    | O => S O
-    | S n' => S (PlusOne n')
-  end.
 
 Fixpoint Create_ServerState (SerStatus : bool) (server_st : list bool) : option (list bool) :=
   match server_st with
@@ -151,9 +145,54 @@ Definition Update_Server_State (server_status : bool) (SG_server : SGServerState
                         end
   end.
 
+Inductive FS_req : Set :=
+  | freq_write : string -> nat -> bool -> FS_req
+  | freq_truncate: string -> FS_req
+  | freq_detach: string -> FS_req
+  | freq_rename: string -> FS_req
+  | freq_putchunks: string -> FS_req
+  | freq_deletechunks: string -> FS_req
+  | freq_setxattr: string -> FS_req
+  | freq_removexattr: string -> FS_req.
+
+Inductive FSRespMsg : Set :=
+  | fresp_write : FSRespMsg
+  | fresp_truncate : FSRespMsg
+  | fresp_detach : FSRespMsg
+  | fresp_rename : FSRespMsg
+  | fresp_putchunks : FSRespMsg
+  | fresp_deletechunks : FSRespMsg
+  | fresp_setxattr : FSRespMsg
+  | fresp_removexattr : FSRespMsg.
+
+Definition client_test (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o:chan RespMsg true) : proc :=
+    nuPl (fun r => parP (OutAtom i (req,r)) (inP r (fun x => OutAtom o x))).
 
 
+Definition server_test (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) 
+                       (f_in: chan FS_req true)
+                       (f_out: chan FSRespMsg true) : proc := 
+    rinP i (fun ar => let a := fst ar in let r := snd ar in 
+                        match a with 
+                          | con_data msg => match msg with
+                                            | req_write req_fname req_offset req_content => outP f_in (freq_write req_fname req_offset req_content) 
+                                                                 (inP f_out (fun c => match c with
+                                                                                       | fresp_write => OutAtom r resp_write
+                                                                                       | _ => OutAtom r resp_write
+                                                                                      end))
+                                            | _ => OutAtom r resp_write
+                                          end
+                          end).
 
+
+Definition fs_test (f_in:chan FS_req false) (f_out:chan FSRespMsg true) (f_st:chan FileSystemState true) : proc :=
+    rinP f_in (fun a => match a with 
+                       | freq_write fname foffset fcontent => inP f_st (fun fst => match FS_Write_Main fname foffset fcontent fst with
+                                                                          | None => outP f_st fst (OutAtom f_out fresp_write)
+                                                                          | Some new_st => outP f_st new_st (OutAtom f_out fresp_write)
+                                                                        end)
+                       | _ => OutAtom f_out fresp_write
+                     end).
 
 
 
