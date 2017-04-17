@@ -841,7 +841,7 @@ auto.
 Qed.
 
 (* Proof: rename operation doesn't violate the property that all filenames are unique *)
-Lemma Check_Rename : forall file_st old_name new_name, Check_Filename_Unique file_st -> match FS_Rename_Main old_name new_name file_st with
+(*Lemma Check_Rename : forall file_st old_name new_name, Check_Filename_Unique file_st -> match FS_Rename_Main old_name new_name file_st with
                                     | None => True (* rename fail means always true *)
                                     | Some new_st => Check_AllStringUnique_List (Return_All_Filename new_st)
                                   end. (* all filenames are unique after rename operation *)
@@ -860,5 +860,5 @@ assumption.
 destruct f.
 simpl.
 destruct file_st.
-simpl in H.
+simpl in H.*)
 
