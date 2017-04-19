@@ -36,9 +36,9 @@ Record Manifest : Set := manifest
 (* c.f. protobufs/sg.proto: l.80-94 *)
 Inductive SG_req : Set :=
   | req_write : string -> nat -> bool -> SG_req
-  | req_truncate: string -> SG_req
+  | req_truncate: string -> nat -> SG_req
   | req_detach: string -> SG_req
-  | req_rename: string -> SG_req
+  | req_rename: string -> string -> SG_req
   | req_putchunks: string -> SG_req
   | req_deletechunks: string -> SG_req
   | req_setxattr: string -> SG_req
@@ -64,7 +64,8 @@ Inductive RespMsg : Set :=
   | resp_removexattr : RespMsg
   | resp_reload : RespMsg
   | resp_refresh : RespMsg
-  | resp_rename_hint : RespMsg.
+  | resp_rename_hint : RespMsg
+  | resp_null : RespMsg.
 
 Definition OutputStream := chan RespMsg true.
 
@@ -100,7 +101,8 @@ Definition sample_Run (i : chan (nat * (chan nat true)) false) (o : chan nat tru
   (parP (sample_server i) (sample_client i o)).
 
 
-(*Definition server (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) : proc := 
+(* Server_v1/Client_v1
+Definition server (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) : proc := 
     rinP i (fun ar => let a := fst ar in let r := snd ar in 
                         match a with 
                           | con_data msg => match msg with
@@ -124,6 +126,7 @@ Definition client (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data
 Definition Run (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o:chan RespMsg true) := 
   (parP (server i) (client req i o)).
 *)
+
 (** Syndicate Server State: contain a list of SGstate as a logical time *)
 Record SGServerState : Set := sg_server_st
   {server_st : list bool}.
@@ -145,53 +148,92 @@ Definition Update_Server_State (server_status : bool) (SG_server : SGServerState
                         end
   end.
 
+(* File System Request *)
 Inductive FS_req : Set :=
+  | freq_read: string -> nat -> FS_req
   | freq_write : string -> nat -> bool -> FS_req
-  | freq_truncate: string -> FS_req
-  | freq_detach: string -> FS_req
-  | freq_rename: string -> FS_req
-  | freq_putchunks: string -> FS_req
-  | freq_deletechunks: string -> FS_req
-  | freq_setxattr: string -> FS_req
-  | freq_removexattr: string -> FS_req.
+  | freq_create: string -> FS_req
+  | freq_delete: string -> FS_req
+  | freq_rename: string -> string -> FS_req
+  | freq_truncate: string -> nat -> FS_req
+  | freq_null : FS_req.
 
+(* File System Response *)
 Inductive FSRespMsg : Set :=
-  | fresp_write : FSRespMsg
-  | fresp_truncate : FSRespMsg
-  | fresp_detach : FSRespMsg
-  | fresp_rename : FSRespMsg
-  | fresp_putchunks : FSRespMsg
-  | fresp_deletechunks : FSRespMsg
-  | fresp_setxattr : FSRespMsg
-  | fresp_removexattr : FSRespMsg.
+  | fresp_read_ok : FSRespMsg
+  | fresp_read_fail : FSRespMsg
+  | fresp_write_ok : FSRespMsg
+  | fresp_write_fail : FSRespMsg
+  | fresp_create_ok : FSRespMsg
+  | fresp_create_fail : FSRespMsg
+  | fresp_delete_ok : FSRespMsg
+  | fresp_delete_fail : FSRespMsg
+  | fresp_rename_ok : FSRespMsg
+  | fresp_rename_fail : FSRespMsg
+  | fresp_truncate_ok : FSRespMsg
+  | fresp_truncate_fail : FSRespMsg
+  | fresp_null : FSRespMsg.
 
-Definition client_test (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o:chan RespMsg true) : proc :=
+Definition Client (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o:chan RespMsg true) : proc :=
     nuPl (fun r => parP (OutAtom i (req,r)) (inP r (fun x => OutAtom o x))).
 
 
-Definition server_test (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) 
+Definition Server (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) 
                        (f_in: chan FS_req true)
                        (f_out: chan FSRespMsg true) : proc := 
     rinP i (fun ar => let a := fst ar in let r := snd ar in 
                         match a with 
                           | con_data msg => match msg with
-                                            | req_write req_fname req_offset req_content => outP f_in (freq_write req_fname req_offset req_content) 
-                                                                 (inP f_out (fun c => match c with
-                                                                                       | fresp_write => OutAtom r resp_write
-                                                                                       | _ => OutAtom r resp_write
-                                                                                      end))
-                                            | _ => OutAtom r resp_write
+                                            | req_write req_fname req_offset req_content => 
+                                                        outP f_in (freq_write req_fname req_offset req_content) 
+                                                        (inP f_out (fun c => match c with
+                                                                             | fresp_write_ok => OutAtom r resp_write
+                                                                             | _ => OutAtom r resp_write
+                                                                             end))
+                                            | req_truncate req_fname req_len => 
+                                                        outP f_in (freq_truncate req_fname req_len) 
+                                                        (inP f_out (fun c => match c with
+                                                                             | fresp_truncate_ok => OutAtom r resp_truncate
+                                                                             | _ => OutAtom r resp_truncate
+                                                                             end))
+                                            | req_rename req_fname_old req_fname_new => 
+                                                        outP f_in (freq_rename req_fname_old req_fname_new) 
+                                                        (inP f_out (fun c => match c with
+                                                                             | fresp_rename_ok => OutAtom r resp_rename
+                                                                             | _ => OutAtom r resp_rename
+                                                                             end))
+                                            | _ => OutAtom r resp_null
                                           end
                           end).
 
 
-Definition fs_test (f_in:chan FS_req false) (f_out:chan FSRespMsg true) (f_st:chan FileSystemState true) : proc :=
+Definition FS (f_in:chan FS_req false) (f_out:chan FSRespMsg true) (f_st:chan FileSystemState true) : proc :=
     rinP f_in (fun a => match a with 
+                       | freq_read fname foffset => inP f_st (fun fst => match FS_Read_Main fname foffset fst with
+                                                                | None => outP f_st fst (OutAtom f_out fresp_read_fail)
+                                                                | Some new_st => outP f_st fst (OutAtom f_out fresp_read_ok)
+                                                              end)
                        | freq_write fname foffset fcontent => inP f_st (fun fst => match FS_Write_Main fname foffset fcontent fst with
-                                                                          | None => outP f_st fst (OutAtom f_out fresp_write)
-                                                                          | Some new_st => outP f_st new_st (OutAtom f_out fresp_write)
+                                                                          | None => outP f_st fst (OutAtom f_out fresp_write_fail)
+                                                                          | Some new_st => outP f_st new_st (OutAtom f_out fresp_write_ok)
                                                                         end)
-                       | _ => OutAtom f_out fresp_write
+                       | freq_create fname => inP f_st (fun fst => match FS_Create_Main fname fst with
+                                                          | None => outP f_st fst (OutAtom f_out fresp_create_fail)
+                                                          | Some new_st => outP f_st new_st (OutAtom f_out fresp_create_ok)
+                                                        end)
+                       | freq_delete fname => inP f_st (fun fst => match FS_Delete_Main fname fst with
+                                                          | None => outP f_st fst (OutAtom f_out fresp_delete_fail)
+                                                          | Some new_st => outP f_st new_st (OutAtom f_out fresp_delete_ok)
+                                                        end)
+                       | freq_rename old_fname new_fname => inP f_st (fun fst => match FS_Rename_Main old_fname new_fname fst with
+                                                          | None => outP f_st fst (OutAtom f_out fresp_rename_fail)
+                                                          | Some new_st => outP f_st new_st (OutAtom f_out fresp_rename_ok)
+                                                        end)
+                       | freq_truncate fname length => inP f_st (fun fst => match FS_Truncate_Main fname length fst with
+                                                          | None => outP f_st fst (OutAtom f_out fresp_truncate_fail)
+                                                          | Some new_st => outP f_st new_st (OutAtom f_out fresp_truncate_ok)
+                                                        end)
+                       | _ => OutAtom f_out fresp_null
                      end).
 
 
