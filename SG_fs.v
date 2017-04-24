@@ -55,7 +55,8 @@ Fixpoint write_content (content : list bool) (offset : nat) (new_content : bool)
   end.
 
 (* Helper func: search file_name and offset; then, write the content *)
-Fixpoint FS_Write (file_name : string) (offset : nat) (content : bool) (file_st : list (string * list bool)) : option (list (string * list bool)) :=
+Fixpoint FS_Write (file_name : string) (offset : nat) (content : bool) 
+                  (file_st : list (string * list bool)) : option (list (string * list bool)) :=
   match file_st with
     | nil => None
     | a::t => match a with
@@ -71,7 +72,8 @@ Fixpoint FS_Write (file_name : string) (offset : nat) (content : bool) (file_st 
   end.
 
 (** FS_Write_Main using FS_Write and write_content *)
-Definition FS_Write_Main (file_name : string) (offset : nat) (content : bool) (file_st : FileSystemState) : option FileSystemState :=
+Definition FS_Write_Main (file_name : string) (offset : nat) (content : bool) 
+                         (file_st : FileSystemState) : option FileSystemState :=
   match file_st with
     | file_sys_st a => match FS_Write file_name offset content a with
                          | None => None
@@ -80,7 +82,8 @@ Definition FS_Write_Main (file_name : string) (offset : nat) (content : bool) (f
   end.
 
 
-Fixpoint FS_Create (file_name : string) (file_st : list (string * list bool)) : option (list (string * list bool)) :=
+Fixpoint FS_Create (file_name : string) (file_st : list (string * list bool)) : 
+                                                  option (list (string * list bool)) :=
   match file_st with
     | nil => Some [(file_name,nil)]
     | hd::tl => match hd with
@@ -100,7 +103,8 @@ Definition FS_Create_Main (file_name : string) (file_st : FileSystemState) : opt
                         end
   end.
 
-Fixpoint FS_Delete (file_name : string) (file_st : list (string * list bool)) : option (list (string * list bool)) :=
+Fixpoint FS_Delete (file_name : string) (file_st : list (string * list bool)) : 
+                                                  option (list (string * list bool)) :=
   match file_st with
     | nil => None
     | hd::tl => match hd with
@@ -120,23 +124,27 @@ Definition FS_Delete_Main (file_name : string) (file_st : FileSystemState) : opt
                         end
   end.
 
-Fixpoint FS_Rename (old_file_name : string) (new_file_name : string) (file_st : list (string * list bool)) : option (list (string * list bool)) :=
+Fixpoint FS_Rename (old_file_name : string) (new_file_name : string) 
+                   (file_st : list (string * list bool)) : option (list (string * list bool)) :=
   match file_st with
     | nil => None
     | hd::tl => match hd with
-                  | (name, content) => if string_dec new_file_name name then None (* check duplicate filename *)
-                                       else if string_dec old_file_name name then match FS_Rename old_file_name new_file_name tl with
-                                                                                    | None => None
-                                                                                    | Some a => Some ((new_file_name, content)::a)
-                                                                                   end
-                                       else match FS_Rename old_file_name new_file_name tl with
-                                              | None => None
-                                              | Some a => Some (hd::a)
-                                            end
+                  | (name, content) => 
+                    if string_dec new_file_name name then None (* check duplicate filename *)
+                    else if string_dec old_file_name name then 
+                            match FS_Rename old_file_name new_file_name tl with
+                              | None => None
+                              | Some a => Some ((new_file_name, content)::a)
+                            end
+                         else match FS_Rename old_file_name new_file_name tl with
+                                | None => None
+                                | Some a => Some (hd::a)
+                              end
                 end                     
   end.
 
-Definition FS_Rename_Main (old_file_name : string) (new_file_name : string) (file_st : FileSystemState) : option FileSystemState :=
+Definition FS_Rename_Main (old_file_name : string) (new_file_name : string) 
+                          (file_st : FileSystemState) : option FileSystemState :=
   match file_st with
     | file_sys_st st => match FS_Rename old_file_name new_file_name st with
                           | None => None
@@ -156,22 +164,26 @@ Fixpoint Truncate_Length (new_len : nat) (content : list bool) : option (list bo
                 end
   end.
 
-Fixpoint FS_Truncate (file_name : string) (new_len : nat) (file_st : list (string * list bool)) : option (list (string * list bool)) :=
+Fixpoint FS_Truncate (file_name : string) (new_len : nat) (file_st : list (string * list bool)) : 
+                                                           option (list (string * list bool)) :=
   match file_st with
     | [] => None
     | hd::tl => match hd with
-                  | (name, content) => if string_dec file_name name then match Truncate_Length new_len content with
-                                                                           | None => None
-                                                                           | Some new_content => Some ((name, new_content)::tl)
-                                                                         end
-                                       else match FS_Truncate file_name new_len tl with
-                                              | None => None
-                                              | Some a => Some (hd::a)
-                                             end
-                 end
+                  | (name, content) => 
+                    if string_dec file_name name then 
+                       match Truncate_Length new_len content with
+                         | None => None
+                         | Some new_content => Some ((name, new_content)::tl)
+                       end
+                    else match FS_Truncate file_name new_len tl with
+                           | None => None
+                           | Some a => Some (hd::a)
+                         end
+                end
   end.
 
-Definition FS_Truncate_Main (file_name : string) (new_len : nat) (file_st : FileSystemState) : option FileSystemState :=
+Definition FS_Truncate_Main (file_name : string) (new_len : nat) (file_st : FileSystemState) : 
+                                                                  option FileSystemState :=
   match file_st with
     | file_sys_st st => match FS_Truncate file_name new_len st with
                           | None => None
@@ -195,10 +207,11 @@ Definition Return_All_Filename (file_st : FileSystemState) : list string :=
   end.
 
 (* Proof: write operation doesn't change the existing file name in the file system *)
-Lemma Check_Write_Doesnot_Change_Filename : forall file_st file_name offset content, match FS_Write_Main file_name offset content file_st with 
-                                                    | None => True (* write fail means always true *)
-                                                    | Some new_st => Return_All_Filename new_st = Return_All_Filename file_st 
-                                                    end. (* new and old file names in file system remain the same *)
+Lemma Check_Write_Doesnot_Change_Filename : forall file_st file_name offset content, 
+                                 match FS_Write_Main file_name offset content file_st with 
+                                   | None => True (* write fail means always true *)
+                                   | Some new_st => Return_All_Filename new_st = Return_All_Filename file_st 
+                                 end. (* new and old file names in file system remain the same *)
 intros.                                    (* introduce inductive definition *)
 destruct file_st.                          (* destruct inductive data type for file_st become fs_st0 *)
 simpl.                                     (* compute *)
@@ -246,10 +259,13 @@ Definition Check_Filename_Unique (file_st : FileSystemState) : Prop :=
   Check_AllStringUnique_List (Return_All_Filename file_st).
 
 (* Proof: write operation doesn't violate the property that all filenames are unique *)
-Lemma Check_Write : forall file_st file_name offset content, Check_Filename_Unique file_st -> match FS_Write_Main file_name offset content file_st with 
-                                                               | None => True (* write fail means always true *)
-                                                               | Some a => Check_Filename_Unique a
-                                                             end. (* all filenames are unique after write operation *)
+Lemma Check_Write : 
+        forall file_st file_name offset content, 
+          Check_Filename_Unique file_st -> 
+            match FS_Write_Main file_name offset content file_st with 
+              | None => True (* write fail means always true *)
+              | Some a => Check_Filename_Unique a
+            end. (* all filenames are unique after write operation *)
 intros.                                                       (* introduce inductive definition *)
 destruct file_st.                                             (* destruct inductive data type for file_st become fs_st0 *)
 simpl.                                                        (* go into FS_Write_Main *)
@@ -297,10 +313,12 @@ Section NatListDoubleInductionPrinciple.
 End NatListDoubleInductionPrinciple.
 
 (* Proof: check written content by write_content is the same as the content returned by return_offset *)
-Lemma check_written_content_sameas_newcontent: forall list_content offset content, match write_content list_content offset content with
-                                                                      | None => True
-                                                                      | Some a => return_offset a offset = Some content
-                                                                      end.
+Lemma check_written_content_sameas_newcontent: 
+        forall list_content offset content, 
+          match write_content list_content offset content with
+            | None => True
+            | Some a => return_offset a offset = Some content
+          end.
 intros.
 generalize offset list_content.
 clear list_content offset.
@@ -324,13 +342,15 @@ Qed.
 (* Proof: Always read latest written file - 
    A content c, written by write operation to a file_name f with a offset o,
    is the same as read operation return by reading f with o *)
-Lemma Read_Latest_Data : forall file_st file_name offset content, match FS_Write_Main file_name offset content file_st with 
-                                                               | None => True (* write fail means always true *)
-                                                               | Some a => match FS_Read_Main file_name offset a with
-                                                                             | None => True
-                                                                             | Some return_content => return_content = content
-                                                                           end
-                                                             end.
+Lemma Read_Latest_Data : 
+        forall file_st file_name offset content, 
+          match FS_Write_Main file_name offset content file_st with 
+            | None => True (* write fail means always true *)
+            | Some a => match FS_Read_Main file_name offset a with
+                          | None => True
+                          | Some return_content => return_content = content
+                        end
+          end.
 intros.
 destruct file_st.
 simpl.
@@ -359,10 +379,12 @@ auto.
 Qed.
 
 (* Proof: truncate operation doesn't change the existing file name in the file system *)
-Lemma Truncate_Doesnot_Change_Filename : forall file_st file_name length, match FS_Truncate_Main file_name length file_st with 
-                                                    | None => True (* truncate fail means always true *)
-                                                    | Some new_st => Return_All_Filename new_st = Return_All_Filename file_st 
-                                                    end. (* new and old file names in file system remain the same *)
+Lemma Truncate_Doesnot_Change_Filename : 
+        forall file_st file_name length, 
+          match FS_Truncate_Main file_name length file_st with 
+            | None => True (* truncate fail means always true *)
+            | Some new_st => Return_All_Filename new_st = Return_All_Filename file_st 
+          end. (* new and old file names in file system remain the same *)
 intros.
 destruct file_st.
 simpl.
@@ -385,10 +407,13 @@ auto.
 Qed.
 
 (* Proof: truncate operation doesn't violate the property that all filenames are unique *)
-Lemma Check_Truncate : forall file_st file_name length, Check_Filename_Unique file_st -> match FS_Truncate_Main file_name length file_st with 
-                                                               | None => True (* truncate fail means always true *)
-                                                               | Some a => Check_Filename_Unique a
-                                                             end. (* all filenames are unique after write operation *)
+Lemma Check_Truncate : 
+        forall file_st file_name length, 
+          Check_Filename_Unique file_st -> 
+            match FS_Truncate_Main file_name length file_st with 
+              | None => True (* truncate fail means always true *)
+              | Some a => Check_Filename_Unique a
+            end. (* all filenames are unique after write operation *)
 intros.
 destruct file_st.
 simpl.
@@ -407,10 +432,13 @@ auto.
 Qed.
 
 (* Proof: create operation always append new filename in the end *)
-Lemma Check_Create_Append: forall file_st file_name, match FS_Create_Main file_name file_st with
-                                    | None => True (* create fail means always true *)
-                                    | Some new_st => New_String_Append (Return_All_Filename file_st) file_name = Return_All_Filename new_st
-                                  end. (* new and old file names in file system remain the same *)
+Lemma Check_Create_Append: 
+        forall file_st file_name, 
+          match FS_Create_Main file_name file_st with
+            | None => True (* create fail means always true *)
+            | Some new_st => 
+                New_String_Append (Return_All_Filename file_st) file_name = Return_All_Filename new_st
+          end. (* new and old file names in file system remain the same *)
 intros.                                (* introduce inductive definition *)
 destruct file_st.                      (* destruct inductive data type for file_st become fs_st0 *)
 simpl.                                 (* compute *)
@@ -430,10 +458,12 @@ auto.                                  (* solve the current goal *)
 Qed.
 
 (* Proof: create operation always create unique filename in the existing file system *)
-Lemma Create_UniqueOne_inFileSys : forall file_st file_name, match FS_Create_Main file_name file_st with 
-                                                             | None => True (* truncate fail means always true *)
-                                                             | Some a => Check_StringUnique_List file_name (Return_All_Filename file_st)
-                                                           end. (* all filenames are unique after create operation *)
+Lemma Create_UniqueOne_inFileSys : 
+        forall file_st file_name, 
+          match FS_Create_Main file_name file_st with 
+            | None => True (* truncate fail means always true *)
+            | Some a => Check_StringUnique_List file_name (Return_All_Filename file_st)
+          end. (* all filenames are unique after create operation *)
 intros.
 destruct file_st.
 simpl.
@@ -453,10 +483,14 @@ auto.
 Qed.
 
 (* Proof: created file is always append and unique *)
-Lemma Create_File_AppendUnique : forall file_st file_name, match FS_Create_Main file_name file_st with
-                                    | None => True (* truncate fail means always true *)
-                                    | Some new_st => Check_StringUnique_List file_name (Return_All_Filename file_st) /\ New_String_Append (Return_All_Filename file_st) file_name = Return_All_Filename new_st
-                                  end. (* all filenames are unique after create operation *)
+Lemma Create_File_AppendUnique : 
+        forall file_st file_name, 
+          match FS_Create_Main file_name file_st with
+            | None => True (* truncate fail means always true *)
+            | Some new_st => 
+                Check_StringUnique_List file_name (Return_All_Filename file_st) /\ 
+                New_String_Append (Return_All_Filename file_st) file_name = Return_All_Filename new_st
+          end. (* all filenames are unique after create operation *)
 intros.
 pose Check_Create_Append.
 specialize (y file_st file_name).
@@ -470,9 +504,11 @@ Qed.
 (* Proof: New_String_Append func doesn't violate the property that all strings are unique *)
 (* 1. The new string is diffent from any string in the esisting string list *)
 (* 2. The strings in the existing string list are unique *)
-Lemma Check_CreatedString : forall old_string_list file_name, Check_StringUnique_List file_name old_string_list ->
-                                                       Check_AllStringUnique_List old_string_list -> 
-                                                       Check_AllStringUnique_List (New_String_Append old_string_list file_name).                                  
+Lemma Check_CreatedString : 
+        forall old_string_list file_name, 
+          Check_StringUnique_List file_name old_string_list ->
+            Check_AllStringUnique_List old_string_list -> 
+              Check_AllStringUnique_List (New_String_Append old_string_list file_name).                                  
 intros.                                 (* introduce inductive definition *)
 induction old_string_list.              (* instantiate old_string_list into two cases *)
 simpl.                                  
@@ -505,10 +541,13 @@ tauto.
 Qed.   
 
 (* Proof: create operation doesn't violate the property that all filenames are unique *)
-Lemma Check_Create : forall file_st file_name, Check_Filename_Unique file_st -> match FS_Create_Main file_name file_st with
-                                    | None => True (* truncate fail means always true *)
-                                    | Some new_st => Check_AllStringUnique_List (Return_All_Filename new_st)
-                                  end. (* all filenames are unique after create operation *)
+Lemma Check_Create : 
+        forall file_st file_name, 
+          Check_Filename_Unique file_st -> 
+            match FS_Create_Main file_name file_st with
+              | None => True (* truncate fail means always true *)
+              | Some new_st => Check_AllStringUnique_List (Return_All_Filename new_st)
+            end. (* all filenames are unique after create operation *)
 intros.
 pose Create_File_AppendUnique.
 specialize (y file_st file_name).
@@ -531,10 +570,13 @@ Fixpoint Delete_String_List (list_string : list string) (delete_name : string) :
   end.
 
 (* Proof: delete operation doesn't change the existing file name in the file system *)
-Lemma Delete_Doesnot_Change_Filename : forall file_st file_name, match FS_Delete_Main file_name file_st with
-                                    | None => True (* delete fail means always true *)
-                                    | Some new_st => Delete_String_List (Return_All_Filename file_st) file_name = Return_All_Filename new_st
-                                  end. (* rest filenames doesn't change  *)
+Lemma Delete_Doesnot_Change_Filename : 
+        forall file_st file_name, 
+          match FS_Delete_Main file_name file_st with
+            | None => True (* delete fail means always true *)
+            | Some new_st => 
+                Delete_String_List (Return_All_Filename file_st) file_name = Return_All_Filename new_st
+          end. (* rest filenames doesn't change  *)
 intros.
 destruct file_st.
 simpl.
@@ -553,8 +595,10 @@ auto.
 Qed.
 
 (* Proof: after deleting one string from the string list, the rest strings of the string list are unique *)
-Lemma StringUnique_AfterDeleteOneString : forall old_string_list file_name delete_name, Check_StringUnique_List file_name old_string_list ->
-                                                           Check_StringUnique_List file_name (Delete_String_List old_string_list delete_name).
+Lemma StringUnique_AfterDeleteOneString : 
+        forall old_string_list file_name delete_name, 
+          Check_StringUnique_List file_name old_string_list ->
+            Check_StringUnique_List file_name (Delete_String_List old_string_list delete_name).
 intros.
 induction old_string_list.
 simpl.
@@ -590,8 +634,10 @@ assumption.
 Qed.
 
 (* Proof: a list of string still unique after delete one string *)
-Lemma StringsUnique_AfterDelete : forall old_string_list file_name, Check_AllStringUnique_List old_string_list ->
-                                                          Check_AllStringUnique_List (Delete_String_List old_string_list file_name).
+Lemma StringsUnique_AfterDelete : 
+        forall old_string_list file_name, 
+          Check_AllStringUnique_List old_string_list ->
+            Check_AllStringUnique_List (Delete_String_List old_string_list file_name).
 intros.
 induction old_string_list.
 simpl.
@@ -614,10 +660,13 @@ assumption.
 Qed.
 
 (* Proof: delete operation doesn't violate the property that all filenames are unique *)
-Lemma Check_Delete : forall file_st file_name, Check_Filename_Unique file_st -> match FS_Delete_Main file_name file_st with
-                                    | None => True (* truncate fail means always true *)
-                                    | Some new_st => Check_AllStringUnique_List (Return_All_Filename new_st)
-                                  end. (* all filenames are unique after delete operation *)
+Lemma Check_Delete : 
+        forall file_st file_name, 
+          Check_Filename_Unique file_st -> 
+            match FS_Delete_Main file_name file_st with
+              | None => True (* truncate fail means always true *)
+              | Some new_st => Check_AllStringUnique_List (Return_All_Filename new_st)
+            end. (* all filenames are unique after delete operation *)
 intros.
 pose Delete_Doesnot_Change_Filename.
 specialize (y file_st file_name).
@@ -630,7 +679,8 @@ Qed.
 
 
 (* rename a string from the current list of string *)
-Fixpoint Rename_aString_inList (old_name : string) (new_name : string) (list_string : list string) : list string :=
+Fixpoint Rename_aString_inList (old_name : string) (new_name : string) 
+                                                   (list_string : list string) : list string :=
   match list_string with
     | [] => []
     | hd::tl => if string_dec new_name hd then hd::tl (* check the duplicate string *)
@@ -639,10 +689,14 @@ Fixpoint Rename_aString_inList (old_name : string) (new_name : string) (list_str
   end.
 
 (* Proof: rename operation doesn't change the other original file name in the file system *)
-Lemma Rename_Doesnot_Change_Filename : forall old_name new_name file_st, match FS_Rename_Main old_name new_name file_st with
-                                    | None => True (* delete fail means always true *)
-                                    | Some new_st => Rename_aString_inList old_name new_name (Return_All_Filename file_st) = Return_All_Filename new_st
-                                  end. (* the other filenames doesn't change  *)
+Lemma Rename_Doesnot_Change_Filename : 
+        forall old_name new_name file_st, 
+          match FS_Rename_Main old_name new_name file_st with
+            | None => True (* delete fail means always true *)
+            | Some new_st => 
+                Rename_aString_inList old_name new_name (Return_All_Filename file_st) = 
+                                                                        Return_All_Filename new_st
+          end. (* the other filenames doesn't change  *)
 intros.
 destruct file_st.
 simpl.
@@ -677,10 +731,13 @@ auto.
 Qed.
 
 (* Proof: The NewName of the rename operation is different from the string lists *)
-Lemma NewName_isUnique : forall file_st old_name new_name, Check_Filename_Unique file_st -> match FS_Rename_Main old_name new_name file_st with
-                                    | None => True (* rename fail means always true *)
-                                    | Some new_st => Check_StringUnique_List new_name (Return_All_Filename file_st)
-                                  end.
+Lemma NewName_isUnique : 
+        forall file_st old_name new_name, 
+          Check_Filename_Unique file_st -> 
+            match FS_Rename_Main old_name new_name file_st with
+              | None => True (* rename fail means always true *)
+              | Some new_st => Check_StringUnique_List new_name (Return_All_Filename file_st)
+            end.
 intros.
 destruct file_st.
 simpl.
@@ -717,7 +774,8 @@ auto.
 Qed.
 
 (* rename a string from the current list of string, but has different form; it's v2 *)
-Fixpoint Rename_aString_inList_v2 (old_name : string) (new_name : string) (list_string : list string) {struct list_string}: list string :=
+Fixpoint Rename_aString_inList_v2 (old_name : string) (new_name : string) (list_string : list string) 
+                                                      {struct list_string}: list string :=
   match list_string with
     | [] => []
     | hd::tl => if string_dec new_name hd then hd::tl (* check the duplicate string *)
@@ -726,8 +784,10 @@ Fixpoint Rename_aString_inList_v2 (old_name : string) (new_name : string) (list_
   end.
 
 (* If the new_name and old_name don't match each other, the string_list remains the same *)
-Lemma RenamedNames_NotMatch : forall old_name new_name string_list, Check_StringUnique_List old_name string_list -> 
-                                                      Rename_aString_inList old_name new_name string_list = string_list.
+Lemma RenamedNames_NotMatch : 
+        forall old_name new_name string_list, 
+          Check_StringUnique_List old_name string_list -> 
+            Rename_aString_inList old_name new_name string_list = string_list.
 intros.
 induction string_list.
 reflexivity.
@@ -743,10 +803,12 @@ assumption.
 Qed.
 
 (* Proof: Rename_aString_inList v1 and v2 behave the same *)
-Lemma Rename_Version_Equal : forall old_name new_name string_list, Check_AllStringUnique_List string_list ->
-                                                                   Check_StringUnique_List new_name string_list ->
-                                                                   Rename_aString_inList old_name new_name string_list = 
-                                                                   Rename_aString_inList_v2 old_name new_name string_list.
+Lemma Rename_Version_Equal : 
+        forall old_name new_name string_list, 
+          Check_AllStringUnique_List string_list ->
+            Check_StringUnique_List new_name string_list ->
+              Rename_aString_inList old_name new_name string_list = 
+                                    Rename_aString_inList_v2 old_name new_name string_list.
 intros.
 induction string_list.
 reflexivity.
@@ -769,9 +831,11 @@ tauto.
 Qed.
 
 (* Proof: after renaming old_name to new_name, unique_name is still unique *)
-Lemma rename_neq_unique : forall unique_name old_name new_name string_list, unique_name <> new_name -> 
-                                        Check_StringUnique_List unique_name string_list -> 
-                                        Check_StringUnique_List unique_name (Rename_aString_inList_v2 old_name new_name string_list).
+Lemma rename_neq_unique : 
+        forall unique_name old_name new_name string_list, 
+          unique_name <> new_name -> 
+            Check_StringUnique_List unique_name string_list -> 
+              Check_StringUnique_List unique_name (Rename_aString_inList_v2 old_name new_name string_list).
 intros.
 induction string_list.
 simpl.
@@ -791,10 +855,14 @@ tauto.
 Qed.
 
 (* All strings are unique after rename old_name to new_name in the list of strings *)
-Lemma AllString_Unique_AfterRenameAString : forall file_st old_name new_name, Check_Filename_Unique file_st -> match FS_Rename_Main old_name new_name file_st with
-                          | None => True (* rename fail means always true *)
-                          | Some new_st => Check_AllStringUnique_List (Rename_aString_inList old_name new_name (Return_All_Filename file_st))
-                        end.
+Lemma AllString_Unique_AfterRenameAString : 
+        forall file_st old_name new_name, 
+          Check_Filename_Unique file_st -> 
+            match FS_Rename_Main old_name new_name file_st with
+              | None => True (* rename fail means always true *)
+              | Some new_st => 
+                  Check_AllStringUnique_List (Rename_aString_inList old_name new_name (Return_All_Filename file_st))
+            end.
 intros.
 pose NewName_isUnique.
 specialize (y file_st old_name new_name).
@@ -841,10 +909,13 @@ auto.
 Qed.
 
 (* Proof: rename operation doesn't violate the property that all filenames are unique *)
-(*Lemma Check_Rename : forall file_st old_name new_name, Check_Filename_Unique file_st -> match FS_Rename_Main old_name new_name file_st with
-                                    | None => True (* rename fail means always true *)
-                                    | Some new_st => Check_AllStringUnique_List (Return_All_Filename new_st)
-                                  end. (* all filenames are unique after rename operation *)
+(*Lemma Check_Rename : 
+          forall file_st old_name new_name, 
+            Check_Filename_Unique file_st -> 
+              match FS_Rename_Main old_name new_name file_st with
+                | None => True (* rename fail means always true *)
+                | Some new_st => Check_AllStringUnique_List (Return_All_Filename new_st)
+              end. (* all filenames are unique after rename operation *)
 intros.
 pose Rename_Doesnot_Change_Filename.
 specialize (y old_name new_name file_st).

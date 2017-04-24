@@ -210,7 +210,8 @@ Fixpoint AssignChan (num : nat)
   end.
 
 (* Input a number and return a pair of f_in and f_out channels *)
-Definition FileChan_Main (num : nat) (chan_st : FileSystemChan) : option ((chan FS_req false) * (chan FSRespMsg false)) := 
+Definition FileChan_Main (num : nat) (chan_st : FileSystemChan) : 
+                                     option ((chan FS_req false) * (chan FSRespMsg false)) := 
   match chan_st with
     | file_sys_chan a => match AssignChan num a with
                            | None => None
@@ -218,92 +219,113 @@ Definition FileChan_Main (num : nat) (chan_st : FileSystemChan) : option ((chan 
                          end
   end.
 
-Definition Client (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg false)) false) (o:chan RespMsg false) : proc :=
+Definition Client (req:md_HTTP_connection_data) 
+                  (i:chan (md_HTTP_connection_data * (chan RespMsg false)) false) 
+                  (o:chan RespMsg false) : proc :=
   nuP (fun r => parP (OutAtom i (req,r)) (inP r (fun x => OutAtom o x))).
 
 Definition Server (i:chan (md_HTTP_connection_data * (chan RespMsg false)) false) 
-                  (rand: chan nat false)
-                  (chan_st : FileSystemChan) : proc := 
+                  (rand: chan nat false) (chan_st : FileSystemChan) : proc := 
   rinP i (fun ar => let a := fst ar in let r := snd ar in 
                     match a with
                       | con_data msg => 
                           inP rand (fun random => 
-                                    match FileChan_Main random chan_st with
-                                      | None => OutAtom r resp_server_error
-                                      | Some (f_in, f_out) =>                                        
-                                      match msg with
-                                        | req_write req_fname req_offset req_content => 
-                                              outP f_in (freq_write req_fname req_offset req_content) 
-                                                   (inP f_out (fun c => match c with
-                                                               | fresp_write_ok => OutAtom r resp_write_ok
-                                                               | _ => OutAtom r resp_write_fail
-                                                               end))
-                                        | req_truncate req_fname req_len => 
-                                              outP f_in (freq_truncate req_fname req_len) 
-                                                   (inP f_out (fun c => match c with
-                                                               | fresp_truncate_ok => OutAtom r resp_truncate_ok
-                                                               | _ => OutAtom r resp_truncate_fail
-                                                               end))
-                                        | req_rename req_fname_old req_fname_new => 
-                                              outP f_in (freq_rename req_fname_old req_fname_new) 
-                                                   (inP f_out (fun c => match c with
-                                                               | fresp_rename_ok => OutAtom r resp_rename_fail
-                                                               | _ => OutAtom r resp_rename_fail
-                                                               end))
-                                        | req_read req_fname req_offset => 
-                                              outP f_in (freq_read req_fname req_offset) 
-                                                   (inP f_out (fun c => match c with
-                                                               | fresp_read_ok => OutAtom r resp_read_ok
-                                                               | _ => OutAtom r resp_read_fail
-                                                               end))
-                                        | req_create req_fname => 
-                                              outP f_in (freq_create req_fname) 
-                                                   (inP f_out (fun c => match c with
-                                                               | fresp_create_ok => OutAtom r resp_create_ok
-                                                               | _ => OutAtom r resp_create_fail
-                                                               end))
-                                        | req_delete req_fname => 
-                                              outP f_in (freq_delete req_fname) 
-                                                   (inP f_out (fun c => match c with
-                                                               | fresp_delete_ok => OutAtom r resp_delete_ok
-                                                               | _ => OutAtom r resp_delete_fail
-                                                               end))
-                                        | _ => OutAtom r resp_null
-                                      end
-                                    end)
+                            match FileChan_Main random chan_st with
+                              | None => OutAtom r resp_server_error
+                              | Some (f_in, f_out) =>                                        
+                                  match msg with
+                                    | req_write req_fname req_offset req_content => 
+                                        outP f_in (freq_write req_fname req_offset req_content) 
+                                          (inP f_out (fun c => 
+                                             match c with
+                                               | fresp_write_ok => OutAtom r resp_write_ok
+                                               | _ => OutAtom r resp_write_fail
+                                             end))
+                                    | req_truncate req_fname req_len => 
+                                        outP f_in (freq_truncate req_fname req_len) 
+                                          (inP f_out (fun c => 
+                                             match c with
+                                               | fresp_truncate_ok => OutAtom r resp_truncate_ok
+                                               | _ => OutAtom r resp_truncate_fail
+                                             end))
+                                    | req_rename req_fname_old req_fname_new => 
+                                        outP f_in (freq_rename req_fname_old req_fname_new) 
+                                          (inP f_out (fun c => 
+                                             match c with
+                                               | fresp_rename_ok => OutAtom r resp_rename_fail
+                                               | _ => OutAtom r resp_rename_fail
+                                             end))
+                                    | req_read req_fname req_offset => 
+                                        outP f_in (freq_read req_fname req_offset) 
+                                          (inP f_out (fun c => 
+                                             match c with
+                                               | fresp_read_ok => OutAtom r resp_read_ok
+                                               | _ => OutAtom r resp_read_fail
+                                             end))
+                                    | req_create req_fname => 
+                                        outP f_in (freq_create req_fname) 
+                                          (inP f_out (fun c => 
+                                             match c with
+                                               | fresp_create_ok => OutAtom r resp_create_ok
+                                               | _ => OutAtom r resp_create_fail
+                                             end))
+                                    | req_delete req_fname => 
+                                        outP f_in (freq_delete req_fname) 
+                                          (inP f_out (fun c => 
+                                             match c with
+                                               | fresp_delete_ok => OutAtom r resp_delete_ok
+                                               | _ => OutAtom r resp_delete_fail
+                                             end))
+                                    | _ => OutAtom r resp_null
+                                  end
+                            end)
                     end).
 
 
-Definition FS (f_in:chan FS_req false) (f_out:chan FSRespMsg false) (f_st:chan FileSystemState false) : proc :=
+Definition FS (f_in:chan FS_req false) (f_out:chan FSRespMsg false) 
+                                       (f_st:chan FileSystemState false) : proc :=
   rinP f_in (fun a => match a with 
-             | freq_read fname foffset => inP f_st (fun fst => match FS_Read_Main fname foffset fst with
-                                                    | None => outP f_st fst (OutAtom f_out fresp_read_fail)
-                                                    | Some new_st => outP f_st fst (OutAtom f_out fresp_read_ok)
-                                                    end)
-             | freq_write fname foffset fcontent => inP f_st (fun fst => match FS_Write_Main fname foffset fcontent fst with
-                                                             | None => outP f_st fst (OutAtom f_out fresp_write_fail)
-                                                             | Some new_st => outP f_st new_st (OutAtom f_out fresp_write_ok)
-                                                             end)
-             | freq_create fname => inP f_st (fun fst => match FS_Create_Main fname fst with
-                                              | None => outP f_st fst (OutAtom f_out fresp_create_fail)
-                                              | Some new_st => outP f_st new_st (OutAtom f_out fresp_create_ok)
-                                              end)
-             | freq_delete fname => inP f_st (fun fst => match FS_Delete_Main fname fst with
-                                              | None => outP f_st fst (OutAtom f_out fresp_delete_fail)
-                                              | Some new_st => outP f_st new_st (OutAtom f_out fresp_delete_ok)
-                                              end)
-             | freq_rename old_fname new_fname => inP f_st (fun fst => match FS_Rename_Main old_fname new_fname fst with
-                                                            | None => outP f_st fst (OutAtom f_out fresp_rename_fail)
-                                                            | Some new_st => outP f_st new_st (OutAtom f_out fresp_rename_ok)
-                                                            end)
-             | freq_truncate fname length => inP f_st (fun fst => match FS_Truncate_Main fname length fst with
-                                                       | None => outP f_st fst (OutAtom f_out fresp_truncate_fail)
-                                                       | Some new_st => outP f_st new_st (OutAtom f_out fresp_truncate_ok)
-                                                       end)
+             | freq_read fname foffset => 
+                 inP f_st (fun fst => 
+                             match FS_Read_Main fname foffset fst with
+                               | None => outP f_st fst (OutAtom f_out fresp_read_fail)
+                               | Some new_st => outP f_st fst (OutAtom f_out fresp_read_ok)
+                             end)
+             | freq_write fname foffset fcontent => 
+                 inP f_st (fun fst => 
+                             match FS_Write_Main fname foffset fcontent fst with
+                               | None => outP f_st fst (OutAtom f_out fresp_write_fail)
+                               | Some new_st => outP f_st new_st (OutAtom f_out fresp_write_ok)
+                             end)
+             | freq_create fname => 
+                 inP f_st (fun fst => 
+                             match FS_Create_Main fname fst with
+                               | None => outP f_st fst (OutAtom f_out fresp_create_fail)
+                               | Some new_st => outP f_st new_st (OutAtom f_out fresp_create_ok)
+                             end)
+             | freq_delete fname => 
+                 inP f_st (fun fst => 
+                             match FS_Delete_Main fname fst with
+                               | None => outP f_st fst (OutAtom f_out fresp_delete_fail)
+                               | Some new_st => outP f_st new_st (OutAtom f_out fresp_delete_ok)
+                             end)
+             | freq_rename old_fname new_fname => 
+                 inP f_st (fun fst => 
+                             match FS_Rename_Main old_fname new_fname fst with
+                               | None => outP f_st fst (OutAtom f_out fresp_rename_fail)
+                               | Some new_st => outP f_st new_st (OutAtom f_out fresp_rename_ok)
+                             end)
+             | freq_truncate fname length => 
+                 inP f_st (fun fst => 
+                             match FS_Truncate_Main fname length fst with
+                               | None => outP f_st fst (OutAtom f_out fresp_truncate_fail)
+                               | Some new_st => outP f_st new_st (OutAtom f_out fresp_truncate_ok)
+                             end)
              | _ => OutAtom f_out fresp_null
             end).
 
-Fixpoint Recursive_FS (chan_st : list ((chan FS_req false) * (chan FSRespMsg false))) (f_st:chan FileSystemState false) : proc :=
+Fixpoint Recursive_FS (chan_st : list ((chan FS_req false) * (chan FSRespMsg false))) 
+                      (f_st:chan FileSystemState false) : proc :=
   match chan_st with
     | [] => zeroP
     | hd::tl => match hd with
