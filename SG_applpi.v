@@ -38,17 +38,17 @@ Inductive SG_req : Set :=
   | req_write : string -> nat -> bool -> SG_req
   | req_truncate: string -> nat -> SG_req
   | req_rename: string -> string -> SG_req
-  | req_read_temp: string -> nat -> SG_req
-  | req_create_temp: string -> SG_req
-  | req_delete_temp: string -> SG_req
-  | req_detach: string -> SG_req
-  | req_putchunks: string -> SG_req
-  | req_deletechunks: string -> SG_req
-  | req_setxattr: string -> SG_req
-  | req_removexattr: string -> SG_req
-  | req_reload: string -> SG_req
-  | req_refresh: string -> SG_req
-  | req_rename_hint: string -> SG_req.
+  | req_read: string -> nat -> SG_req
+  | req_create: string -> SG_req
+  | req_delete: string -> SG_req
+  | req_detach: SG_req
+  | req_putchunks: SG_req
+  | req_deletechunks: SG_req
+  | req_setxattr: SG_req
+  | req_removexattr: SG_req
+  | req_reload: SG_req
+  | req_refresh: SG_req
+  | req_rename_hint: SG_req.
 
 Record md_HTTP_connection_data : Set := con_data
   { header_message : SG_req}.
@@ -214,19 +214,19 @@ Definition Server (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false)
                                                                            | fresp_rename_ok => OutAtom r resp_rename_fail
                                                                            | _ => OutAtom r resp_rename_fail
                                                                            end))
-                                          | req_read_temp req_fname req_offset => 
+                                          | req_read req_fname req_offset => 
                                                       outP f_in (freq_read req_fname req_offset) 
                                                       (inP f_out (fun c => match c with
                                                                            | fresp_read_ok => OutAtom r resp_read_ok
                                                                            | _ => OutAtom r resp_read_fail
                                                                            end))
-                                          | req_create_temp req_fname => 
+                                          | req_create req_fname => 
                                                       outP f_in (freq_create req_fname) 
                                                       (inP f_out (fun c => match c with
                                                                            | fresp_create_ok => OutAtom r resp_create_ok
                                                                            | _ => OutAtom r resp_create_fail
                                                                            end))
-                                          | req_delete_temp req_fname => 
+                                          | req_delete req_fname => 
                                                       outP f_in (freq_delete req_fname) 
                                                       (inP f_out (fun c => match c with
                                                                            | fresp_delete_ok => OutAtom r resp_delete_ok
