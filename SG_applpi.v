@@ -188,11 +188,11 @@ Inductive FSRespMsg : Set :=
   | fresp_null : FSRespMsg.
 
 Record FileSystemChan : Set := file_sys_chan
-  {file_chan : list ((chan FS_req true) * (chan FSRespMsg true))}.
+  {file_chan : list ((chan FS_req false) * (chan FSRespMsg false))}.
 
 Fixpoint AssignChan (num : nat) 
-                    (chan_st : list ((chan FS_req true) * (chan FSRespMsg true))) : 
-                    option ((chan FS_req true)* (chan FSRespMsg true)) :=
+                    (chan_st : list ((chan FS_req false) * (chan FSRespMsg false))) : 
+                    option ((chan FS_req false)* (chan FSRespMsg false)) :=
   match num with
     | O => match chan_st with
              | [] => None
@@ -210,7 +210,7 @@ Fixpoint AssignChan (num : nat)
   end.
 
 (* Input a number and return a pair of f_in and f_out channels *)
-Definition FileChan_Main (num : nat) (chan_st : FileSystemChan) : option ((chan FS_req true) * (chan FSRespMsg true)) := 
+Definition FileChan_Main (num : nat) (chan_st : FileSystemChan) : option ((chan FS_req false) * (chan FSRespMsg false)) := 
   match chan_st with
     | file_sys_chan a => match AssignChan num a with
                            | None => None
@@ -218,11 +218,11 @@ Definition FileChan_Main (num : nat) (chan_st : FileSystemChan) : option ((chan 
                          end
   end.
 
-Definition Client (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) (o:chan RespMsg true) : proc :=
-  nuPl (fun r => parP (OutAtom i (req,r)) (inP r (fun x => OutAtom o x))).
+Definition Client (req:md_HTTP_connection_data) (i:chan (md_HTTP_connection_data * (chan RespMsg false)) false) (o:chan RespMsg false) : proc :=
+  nuP (fun r => parP (OutAtom i (req,r)) (inP r (fun x => OutAtom o x))).
 
-Definition Server (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false) 
-                  (rand: chan nat true)
+Definition Server (i:chan (md_HTTP_connection_data * (chan RespMsg false)) false) 
+                  (rand: chan nat false)
                   (chan_st : FileSystemChan) : proc := 
   rinP i (fun ar => let a := fst ar in let r := snd ar in 
                     match a with
@@ -274,7 +274,7 @@ Definition Server (i:chan (md_HTTP_connection_data * (chan RespMsg true)) false)
                     end).
 
 
-Definition FS (f_in:chan FS_req false) (f_out:chan FSRespMsg true) (f_st:chan FileSystemState true) : proc :=
+Definition FS (f_in:chan FS_req false) (f_out:chan FSRespMsg false) (f_st:chan FileSystemState false) : proc :=
   rinP f_in (fun a => match a with 
              | freq_read fname foffset => inP f_st (fun fst => match FS_Read_Main fname foffset fst with
                                                     | None => outP f_st fst (OutAtom f_out fresp_read_fail)
@@ -302,6 +302,37 @@ Definition FS (f_in:chan FS_req false) (f_out:chan FSRespMsg true) (f_st:chan Fi
                                                        end)
              | _ => OutAtom f_out fresp_null
             end).
+
+Fixpoint Recursive_FS (chan_st : list ((chan FS_req false) * (chan FSRespMsg false))) (f_st:chan FileSystemState false) : proc :=
+  match chan_st with
+    | [] => zeroP
+    | hd::tl => match hd with
+                  | (f_in, f_out) => parP (FS f_in f_out f_st) (Recursive_FS tl f_st)
+                end
+  end.
+
+Definition Construct_FS (chan_st : FileSystemChan) (f_st:chan FileSystemState false) : proc :=
+  match chan_st with
+    | file_sys_chan a =>  Recursive_FS a f_st
+  end.
+
+
+Definition Run (req:md_HTTP_connection_data) (o:chan RespMsg false)
+               (i:chan (md_HTTP_connection_data * (chan RespMsg false)) false)
+               (chan_st : FileSystemChan) (f_st:chan FileSystemState false) (rand: chan nat false) :=
+  (parP (Client req i o) (parP (Server i rand chan_st) (Construct_FS chan_st f_st))).
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
