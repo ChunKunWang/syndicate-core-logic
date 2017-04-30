@@ -190,19 +190,26 @@ Inductive FSRespMsg : Set :=
 Record FileSystemChan : Set := file_sys_chan
   {file_chan : list ((chan FS_req false) * (chan FSRespMsg false))}.
 
-Fixpoint AssignChan (num : nat) 
-                    (chan_st : list ((chan FS_req false) * (chan FSRespMsg false))) : 
+(* modulo the input number to assign a pair of channels in FileSystemChan *)
+Fixpoint AssignChan (num : nat)
+                    (chan_st : list ((chan FS_req false) * (chan FSRespMsg false))) 
+                    (chan_st_orig : list ((chan FS_req false) * (chan FSRespMsg false))) : 
                     option ((chan FS_req false)* (chan FSRespMsg false)) :=
   match num with
     | O => match chan_st with
-             | [] => None
+             | [] => match chan_st_orig with
+                       | [] => None (* input chan_st is an empty list *)
+                       | hd::tl => match hd with
+                                     | (f_in, f_out) => Some (f_in, f_out)
+                                   end
+                     end
              | hd::tl => match hd with
                            | (f_in, f_out) => Some (f_in, f_out)
                          end
            end
     | S rest => match chan_st with
-                  | [] => None
-                  | hd::tl => match AssignChan rest tl with
+                  | [] => AssignChan rest chan_st_orig chan_st_orig
+                  | hd::tl => match AssignChan rest tl chan_st_orig with
                                 | None => None
                                 | Some (f_in, f_out) => Some (f_in, f_out)
                               end
@@ -213,7 +220,7 @@ Fixpoint AssignChan (num : nat)
 Definition FileChan_Main (num : nat) (chan_st : FileSystemChan) : 
                                      option ((chan FS_req false) * (chan FSRespMsg false)) := 
   match chan_st with
-    | file_sys_chan a => match AssignChan num a with
+    | file_sys_chan a => match AssignChan num a a with
                            | None => None
                            | Some (f_in, f_out) => Some (f_in, f_out)
                          end
@@ -234,33 +241,19 @@ Definition Server (i:chan (md_HTTP_connection_data * (chan RespMsg false)) false
                               | None => OutAtom r resp_server_error
                               | Some (f_in, f_out) =>                                        
                                   match msg with
-                                    | req_write req_fname req_offset req_content => 
-                                        outP f_in (freq_write req_fname req_offset req_content) 
-                                          (inP f_out (fun c => 
-                                             match c with
-                                               | fresp_write_ok => OutAtom r resp_write_ok
-                                               | _ => OutAtom r resp_write_fail
-                                             end))
-                                    | req_truncate req_fname req_len => 
-                                        outP f_in (freq_truncate req_fname req_len) 
-                                          (inP f_out (fun c => 
-                                             match c with
-                                               | fresp_truncate_ok => OutAtom r resp_truncate_ok
-                                               | _ => OutAtom r resp_truncate_fail
-                                             end))
-                                    | req_rename req_fname_old req_fname_new => 
-                                        outP f_in (freq_rename req_fname_old req_fname_new) 
-                                          (inP f_out (fun c => 
-                                             match c with
-                                               | fresp_rename_ok => OutAtom r resp_rename_fail
-                                               | _ => OutAtom r resp_rename_fail
-                                             end))
                                     | req_read req_fname req_offset => 
                                         outP f_in (freq_read req_fname req_offset) 
                                           (inP f_out (fun c => 
                                              match c with
                                                | fresp_read_ok => OutAtom r resp_read_ok
                                                | _ => OutAtom r resp_read_fail
+                                             end))             
+                                    | req_write req_fname req_offset req_content => 
+                                        outP f_in (freq_write req_fname req_offset req_content) 
+                                          (inP f_out (fun c => 
+                                             match c with
+                                               | fresp_write_ok => OutAtom r resp_write_ok
+                                               | _ => OutAtom r resp_write_fail
                                              end))
                                     | req_create req_fname => 
                                         outP f_in (freq_create req_fname) 
@@ -276,11 +269,24 @@ Definition Server (i:chan (md_HTTP_connection_data * (chan RespMsg false)) false
                                                | fresp_delete_ok => OutAtom r resp_delete_ok
                                                | _ => OutAtom r resp_delete_fail
                                              end))
+                                    | req_rename req_fname_old req_fname_new => 
+                                        outP f_in (freq_rename req_fname_old req_fname_new) 
+                                          (inP f_out (fun c => 
+                                             match c with
+                                               | fresp_rename_ok => OutAtom r resp_rename_fail
+                                               | _ => OutAtom r resp_rename_fail
+                                             end))
+                                    | req_truncate req_fname req_len => 
+                                        outP f_in (freq_truncate req_fname req_len) 
+                                          (inP f_out (fun c => 
+                                             match c with
+                                               | fresp_truncate_ok => OutAtom r resp_truncate_ok
+                                               | _ => OutAtom r resp_truncate_fail
+                                             end))
                                     | _ => OutAtom r resp_null
                                   end
                             end)
                     end).
-
 
 Definition FS (f_in:chan FS_req false) (f_out:chan FSRespMsg false) 
                                        (f_st:chan FileSystemState false) : proc :=
@@ -335,17 +341,24 @@ Fixpoint Recursive_FS (chan_st : list ((chan FS_req false) * (chan FSRespMsg fal
 
 Definition Construct_FS (chan_st : FileSystemChan) (f_st:chan FileSystemState false) : proc :=
   match chan_st with
-    | file_sys_chan a =>  Recursive_FS a f_st
+    | file_sys_chan a => Recursive_FS a f_st
   end.
 
+Fixpoint Init_FS (num : nat) (rand: chan nat false)
+                             (i:chan (md_HTTP_connection_data * (chan RespMsg false)) false)
+                             (ch_lt: list ((chan FS_req false) * (chan FSRespMsg false))) 
+                             (f_st:chan FileSystemState false) : proc :=
+  match num with 
+    | O => parP (Construct_FS (file_sys_chan ch_lt) f_st) (Server i rand (file_sys_chan ch_lt))
+    | S n => nuP (fun f_in =>
+                  nuP (fun f_out => Init_FS n rand i ((f_in, f_out)::ch_lt) f_st))
+  end.
 
 Definition Run (req:md_HTTP_connection_data) (o:chan RespMsg false)
+               (num_fs : nat)
                (i:chan (md_HTTP_connection_data * (chan RespMsg false)) false)
                (chan_st : FileSystemChan) (f_st:chan FileSystemState false) (rand: chan nat false) :=
-  (parP (Client req i o) (parP (Server i rand chan_st) (Construct_FS chan_st f_st))).
-
-
-
+  (parP (Client req i o) (Init_FS num_fs rand i [] f_st)).
 
 
 
