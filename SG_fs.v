@@ -23,7 +23,8 @@ Fixpoint return_offset (content : list bool) (offset : nat) : option bool :=
   end.
 
 (* Helper func: search file_name in fs and return content of the offset *)
-Fixpoint FS_Read (file_name : string) (offset : nat) (file_st : list (string * list bool)) : option bool :=
+Fixpoint FS_Read (file_name : string) (offset : nat) 
+                   (file_st : list (string * list bool)) : option bool :=
   match file_st with
     | nil => None
     | a::t => match a with (* compare the file_name and keeping searching from fs *)
@@ -33,13 +34,15 @@ Fixpoint FS_Read (file_name : string) (offset : nat) (file_st : list (string * l
   end.
 
 (** FS_Read_Main using FS_Read and return_offset *)
-Definition FS_Read_Main (file_name : string) (offset : nat) (file_st : FileSystemState) : option bool :=
+Definition FS_Read_Main (file_name : string) (offset : nat) 
+                          (file_st : FileSystemState) : option bool :=
   match file_st with
     | file_sys_st a => FS_Read file_name offset a
   end.
 
 (* Helper func: search offset and write new content *)
-Fixpoint write_content (content : list bool) (offset : nat) (new_content : bool) : option (list bool) :=
+Fixpoint write_content (content : list bool) (offset : nat) 
+                         (new_content : bool) : option (list bool) :=
   match offset with
     | O => match content with
              | [] => Some [new_content]
@@ -56,14 +59,16 @@ Fixpoint write_content (content : list bool) (offset : nat) (new_content : bool)
 
 (* Helper func: search file_name and offset; then, write the content *)
 Fixpoint FS_Write (file_name : string) (offset : nat) (content : bool) 
-                  (file_st : list (string * list bool)) : option (list (string * list bool)) :=
+                    (file_st : list (string * list bool)) : 
+                      option (list (string * list bool)) :=
   match file_st with
     | nil => None
     | a::t => match a with
-             | (s,b) => if string_dec file_name s then match write_content b offset content with
-                                                         | None => None
-                                                         | Some a => Some ((s,a)::t)
-                                                        end
+             | (s,b) => if string_dec file_name s then 
+                            match write_content b offset content with
+                              | None => None
+                              | Some a => Some ((s,a)::t)
+                            end
                         else match FS_Write file_name offset content t with
                                | None => None
                                | Some b => Some (a::b)
@@ -72,8 +77,9 @@ Fixpoint FS_Write (file_name : string) (offset : nat) (content : bool)
   end.
 
 (** FS_Write_Main using FS_Write and write_content *)
-Definition FS_Write_Main (file_name : string) (offset : nat) (content : bool) 
-                         (file_st : FileSystemState) : option FileSystemState :=
+Definition FS_Write_Main (file_name : string) 
+                           (offset : nat) (content : bool) 
+                             (file_st : FileSystemState) : option FileSystemState :=
   match file_st with
     | file_sys_st a => match FS_Write file_name offset content a with
                          | None => None
@@ -82,8 +88,9 @@ Definition FS_Write_Main (file_name : string) (offset : nat) (content : bool)
   end.
 
 
-Fixpoint FS_Create (file_name : string) (file_st : list (string * list bool)) : 
-                                                  option (list (string * list bool)) :=
+Fixpoint FS_Create (file_name : string) 
+                     (file_st : list (string * list bool)) : 
+                       option (list (string * list bool)) :=
   match file_st with
     | nil => Some [(file_name,nil)]
     | hd::tl => match hd with
@@ -95,7 +102,9 @@ Fixpoint FS_Create (file_name : string) (file_st : list (string * list bool)) :
                 end 
   end.
 
-Definition FS_Create_Main (file_name : string) (file_st : FileSystemState) : option FileSystemState :=
+Definition FS_Create_Main (file_name : string) 
+                            (file_st : FileSystemState) : 
+                              option FileSystemState :=
   match file_st with
     | file_sys_st st => match FS_Create file_name st with
                           | None => None
@@ -124,8 +133,10 @@ Definition FS_Delete_Main (file_name : string) (file_st : FileSystemState) : opt
                         end
   end.
 
-Fixpoint FS_Rename (old_file_name : string) (new_file_name : string) 
-                   (file_st : list (string * list bool)) : option (list (string * list bool)) :=
+Fixpoint FS_Rename (old_file_name : string) 
+                     (new_file_name : string) 
+                       (file_st : list (string * list bool)) : 
+                         option (list (string * list bool)) :=
   match file_st with
     | nil => None
     | hd::tl => match hd with
@@ -143,8 +154,10 @@ Fixpoint FS_Rename (old_file_name : string) (new_file_name : string)
                 end                     
   end.
 
-Definition FS_Rename_Main (old_file_name : string) (new_file_name : string) 
-                          (file_st : FileSystemState) : option FileSystemState :=
+Definition FS_Rename_Main (old_file_name : string) 
+                            (new_file_name : string) 
+                              (file_st : FileSystemState) : 
+                                option FileSystemState :=
   match file_st with
     | file_sys_st st => match FS_Rename old_file_name new_file_name st with
                           | None => None
@@ -164,8 +177,9 @@ Fixpoint Truncate_Length (new_len : nat) (content : list bool) : option (list bo
                 end
   end.
 
-Fixpoint FS_Truncate (file_name : string) (new_len : nat) (file_st : list (string * list bool)) : 
-                                                           option (list (string * list bool)) :=
+Fixpoint FS_Truncate (file_name : string) (new_len : nat) 
+                       (file_st : list (string * list bool)) : 
+                         option (list (string * list bool)) :=
   match file_st with
     | [] => None
     | hd::tl => match hd with
@@ -182,8 +196,9 @@ Fixpoint FS_Truncate (file_name : string) (new_len : nat) (file_st : list (strin
                 end
   end.
 
-Definition FS_Truncate_Main (file_name : string) (new_len : nat) (file_st : FileSystemState) : 
-                                                                  option FileSystemState :=
+Definition FS_Truncate_Main (file_name : string) (new_len : nat) 
+                              (file_st : FileSystemState) : 
+                                option FileSystemState :=
   match file_st with
     | file_sys_st st => match FS_Truncate file_name new_len st with
                           | None => None
@@ -207,11 +222,12 @@ Definition Return_All_Filename (file_st : FileSystemState) : list string :=
   end.
 
 (* Proof: write operation doesn't change the existing file name in the file system *)
-Lemma Check_Write_Doesnot_Change_Filename : forall file_st file_name offset content, 
-                                 match FS_Write_Main file_name offset content file_st with 
-                                   | None => True (* write fail means always true *)
-                                   | Some new_st => Return_All_Filename new_st = Return_All_Filename file_st 
-                                 end. (* new and old file names in file system remain the same *)
+Lemma Check_Write_Doesnot_Change_Filename : 
+        forall file_st file_name offset content, 
+          match FS_Write_Main file_name offset content file_st with 
+            | None => True (* write fail means always true *)
+            | Some new_st => Return_All_Filename new_st = Return_All_Filename file_st 
+          end. (* new and old file names in file system remain the same *)
 intros.                                    (* introduce inductive definition *)
 destruct file_st.                          (* destruct inductive data type for file_st become fs_st0 *)
 simpl.                                     (* compute *)
@@ -234,14 +250,16 @@ auto.                                      (* solve the current goal *)
 Qed.
 
 (* check new string append to the current list of string *)
-Fixpoint New_String_Append (list_string : list string) (new_string : string) : list string :=
+Fixpoint New_String_Append (list_string : list string) 
+                             (new_string : string) : list string :=
   match list_string with
     | [] => [new_string]
     | hd::tl => hd::New_String_Append tl new_string
   end.
 
 (* Compare new string to the strings of the list strings in the way of bubble sort *)
-Fixpoint Check_StringUnique_List (new_string : string) (list_string : list string) : Prop :=
+Fixpoint Check_StringUnique_List (new_string : string) 
+                                   (list_string : list string) : Prop :=
   match list_string with
     | [] => True
     | hd::tl => ~(new_string = hd) /\ Check_StringUnique_List new_string tl
@@ -342,7 +360,7 @@ Qed.
 (* Proof: Always read latest written file - 
    A content c, written by write operation to a file_name f with a offset o,
    is the same as read operation return by reading f with o *)
-Lemma Read_Latest_Data : 
+Lemma Read_After_Write : 
         forall file_st file_name offset content, 
           match FS_Write_Main file_name offset content file_st with 
             | None => True (* write fail means always true *)
